@@ -373,11 +373,11 @@ class SharkStrategy(RivalStrategy):    # Phase 2
 
 ---
 
-### 8. Bluff & Signal System (`game_engine/bluffing.py`)
+### 8. Bluff System — "Trash Talk" (`game_engine/bluffing.py`)
 
 **How it works:**
 
-At the start of each turn, **before** spending AP, the player may make one **public announcement** (free, no AP cost). This announcement is visible to all AI rivals.
+At the start of each turn, **before** spending AP, the player may say one thing to their rival (free, no AP cost). This shows up in the **Trash Talk** board and the AI rival reacts to it.
 
 **Announcement types:**
 
@@ -551,27 +551,121 @@ In multiplayer, pausing and unpausing both require consensus:
 
 ## Frontend Architecture
 
+### Application Flow
+
+```
+LaunchPage
+  ├── [PLAY]     → difficulty select → new game → GameScreen
+  ├── [TUTORIAL] → TutorialScreen (guided walkthrough)
+  └── [CONTINUE] → resume saved game → GameScreen (if save exists)
+```
+
+### Launch Page (`LaunchPage.tsx`)
+
+The entry point. Minimal, game-branded, no info dump.
+
+**Contents:**
+- Game logo / title ("Mogul Blocks")
+- **PLAY** button — starts a new game (prompts difficulty: Easy / Hard)
+- **TUTORIAL** button — launches the guided tutorial flow
+- **CONTINUE** button — only shown if a saved game exists in SQLite
+- No rules, no stats, no spoilers — just the three buttons
+
+### Tutorial System (`TutorialScreen.tsx` + `TutorialOverlay.tsx`)
+
+Two-part tutorial:
+
+**1. TutorialScreen (standalone, from Launch Page)**
+A scripted, interactive walkthrough that plays out a fake 3-turn game:
+- Turn 1: Learn what Action Points are → prompted to Buy a property
+- Turn 2: Learn the Signal Market chat → prompted to send an announcement, watch Flipper react
+- Turn 3: Learn Research → answer a trivia question, see intel revealed on the board
+- End: Short summary of the full game loop, then "START REAL GAME" button
+
+Each step highlights the relevant UI element with a spotlight overlay and a speech-bubble tooltip. Player must complete the prompted action to advance — no passive reading.
+
+**2. TutorialOverlay (in-game, first real game only)**
+Subtle hints that appear on the first real game if tutorial was completed:
+- Turn 1: "This is your first property listing. Buy it to start earning rent."
+- First Research: "Correct = real intel. Wrong = misleading info. Choose difficulty wisely."
+- First Auction: "Sealed bid — neither player sees the other's bid before submitting."
+Dismissed individually. Never shown again after first game.
+
 ### Component Tree
 
 ```
 <App>
-├── <GameProvider>               ← Zustand store for game state
-│   ├── <TopBar>                 ← Turn counter, AP meter, cash display, pause button
-│   ├── <BluffBar>               ← Announcement input (before spending AP)
-│   ├── <MainLayout>
-│   │   ├── <DistrictBoard>      ← Pixel art tile grid of properties
-│   │   │   └── <PropertyTile>   ← Animated pixel sprite (changes with dev level)
-│   │   ├── <ActionPanel>        ← Buy, Develop, Research buttons + AP tracker
-│   │   └── <SidePanel>
-│   │       ├── <Portfolio>      ← Owned properties, cash flow, debt meter
-│   │       ├── <IntelFeed>      ← Revealed intel with confidence markers
-│   │       └── <RivalTracker>   ← AI status, recent actions, reputation bar
-│   ├── <TriviaModal>            ← Full-screen trivia overlay
-│   ├── <AuctionModal>           ← Sealed-bid interface with countdown
-│   ├── <EventToast>             ← Pixel-art styled pop-up notifications
-│   ├── <PauseMenu>              ← Save/resume/quit with confirmation
-│   └── <GameOverScreen>         ← Final score, finance reveals, replay option
+├── <LaunchPage>                 ← Entry: Play, Tutorial, Continue buttons
+│
+├── <TutorialScreen>             ← Standalone guided walkthrough (3 scripted turns)
+│   └── <TutorialOverlay>        ← Spotlight + tooltip wrapper for any element
+│
+└── <GameScreen>
+    ├── <GameProvider>           ← Zustand store for game state
+    │   │
+    │   ├── ── HEADER ──
+    │   ├── <TopBar>             ← Turn X/20, AP bubbles (●●●), cash, pause button
+    │   │
+    │   ├── ── GAME BOARD (center, dominant) ──
+    │   ├── <DistrictBoard>      ← Pixel art property grid (main game board)
+    │   │   └── <PropertyTile>   ← Animated sprite; heat indicator; owner badge
+    │   │
+    │   ├── ── LEFT PANEL ──
+    │   ├── <PlayerCard>         ← "YOU" — cash, owned count, net worth, AP remaining
+    │   ├── <ActionPanel>        ← BUY / DEVELOP / RESEARCH buttons
+    │   │
+    │   ├── ── RIGHT PANEL ──
+    │   ├── <RivalCard>          ← "THE FLIPPER" — portrait, cash estimate, properties
+    │   ├── <TrashTalkBoard>     ← Trash talk / bluff panel (free, once per turn)
+    │   │
+    │   ├── ── BOTTOM BAR ──
+    │   ├── <IntelFeed>          ← Compact scrolling list of revealed intel items
+    │   │
+    │   └── ── MODALS / OVERLAYS ──
+    │       ├── <TriviaModal>    ← Full-screen trivia overlay
+    │       ├── <AuctionModal>   ← Sealed-bid interface with countdown
+    │       ├── <EventToast>     ← Pixel-art pop-up notifications (top-right)
+    │       ├── <PauseMenu>      ← Save / Resume / Quit
+    │       └── <GameOverScreen> ← Final score, finance reveals, replay option
 ```
+
+### Player Identity
+
+Every piece of state is attributed to a named side — never anonymous.
+
+| Label | Who | Color |
+|---|---|---|
+| **YOU** | Human player | Blue |
+| **THE FLIPPER** | AI rival (MVP) | Orange |
+
+**PlayerCard (YOU):** Shows your portrait placeholder, cash balance, AP remaining as filled/empty circles (●●○ = 2 AP left), properties owned count, and net worth. This is the only place cash + net worth appears — not restated elsewhere.
+
+**RivalCard (THE FLIPPER):** Shows Flipper's pixel portrait, estimated cash (imperfect — you only learn what you research), and a list of properties Flipper owns with their development levels.
+
+### Trash Talk Board (`TrashTalkBoard.tsx`)
+
+Before spending any AP each turn, you can taunt, bluff, or call out your rival. The board shows the running history of what you've said and how Flipper responded. It's labeled **"TRASH TALK"** — immediately legible, no explanation needed.
+
+```
+┌─────────────────────────────┐
+│  💬 TRASH TALK              │
+│─────────────────────────────│
+│ FLIPPER  *bought Cloud9*    │
+│ YOU      "Back off my turf" │
+│ FLIPPER  *bought LAN House* │
+│─────────────────────────────│
+│ [Say something...]     [↵]  │
+│  (free · once per turn)     │
+└─────────────────────────────┘
+```
+
+- Your taunts/bluffs appear right-aligned (blue)
+- Flipper's actions and reactions appear left-aligned (orange)
+- Input only unlocks at the **start** of your turn, before you spend AP. Greyed out otherwise.
+- Label under the input: "free · once per turn" — no one needs to guess whether it costs AP
+- Game mechanics: Flipper takes your words at face value. Say you're buying in one area → Flipper races there → you buy somewhere else. The tutorial explains this through play, not text.
+
+> **Why "Trash Talk" not "Signal Market":** Every player immediately understands talking trash to a rival. The underlying mechanic (bluffing, misdirection) is discovered through play. Name the experience, not the mechanic.
 
 ### Visual Style: Pixel Art + Animations
 
@@ -953,20 +1047,25 @@ mogul-blocks/
 │   │   │   └── websocket.ts         # WebSocket handler
 │   │   ├── store/
 │   │   │   └── gameStore.ts         # Zustand store
+│   │   ├── pages/
+│   │   │   ├── LaunchPage.tsx       # Play / Tutorial / Continue buttons
+│   │   │   ├── TutorialScreen.tsx   # Scripted 3-turn walkthrough
+│   │   │   └── GameScreen.tsx       # Main game shell
 │   │   ├── components/
-│   │   │   ├── TopBar.tsx
-│   │   │   ├── BluffBar.tsx         # Announcement input
+│   │   │   ├── TopBar.tsx           # Turn counter, AP bubbles, pause
 │   │   │   ├── DistrictBoard.tsx
-│   │   │   ├── PropertyTile.tsx     # Pixel art sprite + animation
-│   │   │   ├── ActionPanel.tsx
-│   │   │   ├── Portfolio.tsx
-│   │   │   ├── IntelFeed.tsx
-│   │   │   ├── RivalTracker.tsx
+│   │   │   ├── PropertyTile.tsx     # Pixel art sprite + heat indicator + owner badge
+│   │   │   ├── ActionPanel.tsx      # BUY / DEVELOP / RESEARCH buttons
+│   │   │   ├── PlayerCard.tsx       # ★ YOU — cash, AP, net worth
+│   │   │   ├── RivalCard.tsx        # ★ THE FLIPPER — portrait, properties, est. cash
+│   │   │   ├── TrashTalkBoard.tsx   # ★ Bluff panel — labeled "TRASH TALK" (replaces BluffBar)
+│   │   │   ├── IntelFeed.tsx        # Compact scrolling intel list (bottom bar)
 │   │   │   ├── TriviaModal.tsx
 │   │   │   ├── AuctionModal.tsx
 │   │   │   ├── EventToast.tsx
 │   │   │   ├── PauseMenu.tsx
-│   │   │   └── GameOverScreen.tsx
+│   │   │   ├── GameOverScreen.tsx
+│   │   │   └── TutorialOverlay.tsx  # Spotlight + tooltip for in-game hints
 │   │   ├── sprites/                 # ★ Pixel art assets
 │   │   │   ├── properties/          # Per-property sprite sheets
 │   │   │   ├── effects/             # Boom/bust overlays
@@ -990,6 +1089,27 @@ mogul-blocks/
 ├── architecture.md
 └── README.md
 ```
+
+---
+
+## Implementation Order (Feature by Feature)
+
+Build and test one feature at a time in this sequence. Each step is playable before moving to the next.
+
+| Step | Feature | What You Can Test |
+|---|---|---|
+| 1 | **Launch Page** | Play / Tutorial / Continue buttons render and route correctly |
+| 2 | **Game Board shell** | Empty district board with 10 property tiles, PlayerCard (YOU), RivalCard (FLIPPER), TopBar |
+| 3 | **Buy action** | Click a listed property → it gets owned by YOU, cash deducted, tile updates |
+| 4 | **End Turn + Rent** | End Turn button triggers rent collection, turn counter advances, AI takes a buy action |
+| 5 | **Develop action** | Select owned property → pay cost → sprite upgrades, rent yield increases |
+| 6 | **Research + Trivia** | Research button → trivia modal → correct/wrong answer → intel shown in feed |
+| 7 | **Bluff panel** | Chat input available before AP spending, Flipper reacts to your message |
+| 8 | **Auction** | When both YOU and Flipper want same property → bid modal fires |
+| 9 | **Tutorial flow** | Scripted 3-turn walkthrough using real game components |
+| 10 | **Game Over + Score** | Victory / bankruptcy screen with final net worth breakdown |
+
+Do not start Step N+1 until Step N is fully working end-to-end.
 
 ---
 
