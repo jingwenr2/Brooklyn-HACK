@@ -3,6 +3,13 @@ import random
 from sqlalchemy.orm import Session
 from backend.models.core import GameState, Player, Property
 import backend.config as config
+from backend.game_engine.ai.base import Action, RivalStrategy
+from backend.game_engine.ai.flipper import FlipperStrategy
+
+# Stateless strategy instances keyed by Player.role
+_STRATEGIES: dict[str, RivalStrategy] = {
+    "FLIPPER": FlipperStrategy(),
+}
 
 def create_new_game(db: Session, session_id: str) -> GameState:
     """Initializes a new game state, creating players and 10 property plots."""
@@ -93,6 +100,9 @@ def end_turn(db: Session, game: GameState):
     Ends the current turn, processing all cash flow (Rent & Debt).
     Moves the game state forward to the next round.
     """
+    # 0. AI Phase: rivals execute any pending buys/sells before rent is settled.
+    ai_phase(db, game)
+
     # 1. Cash Flow: Collect Rent for all owned properties
     owned_properties = db.query(Property).filter(
         Property.game_id == game.id,
@@ -125,5 +135,102 @@ def end_turn(db: Session, game: GameState):
     else:
         game.turn += 1
         game.current_ap = 0 # AP resets
-        
+
+    # 4. AI Scan: flag next-turn targets so the 👀 icon is visible immediately.
+    ai_scan_phase(db, game)
+
     db.commit()
+
+
+def _active_rivals(db: Session, game: GameState) -> list[Player]:
+    return (
+        db.query(Player)
+        .filter(
+            Player.game_id == game.id,
+            Player.role != "USER",
+            Player.is_bankrupt == False,  # noqa: E712
+        )
+        .all()
+    )
+
+
+def ai_phase(db: Session, game: GameState) -> list[dict]:
+    """Run each rival's act() and apply resulting actions.
+
+    Returns event records for the intel feed.
+    """
+    events: list[dict] = []
+    for rival in _active_rivals(db, game):
+        strategy = _STRATEGIES.get(rival.role)
+        if strategy is None:
+            continue
+        for action in strategy.act(db, game, rival):
+            record = _apply_rival_action(db, game, rival, action)
+            if record is not None:
+                events.append(record)
+    db.flush()
+    return events
+
+
+def ai_scan_phase(db: Session, game: GameState) -> None:
+    """Run each rival's scan() to set targets for the next turn."""
+    for rival in _active_rivals(db, game):
+        strategy = _STRATEGIES.get(rival.role)
+        if strategy is None:
+            continue
+        strategy.scan(db, game, rival)
+
+
+def _apply_rival_action(
+    db: Session, game: GameState, rival: Player, action: Action
+) -> dict | None:
+    """Execute a single rival action. Silently drops actions that became invalid
+    between scan() and act() (e.g. player bought the target first).
+
+    TODO: replace with the shared ActionProcessor once the player Buy endpoint
+    lands in Step 3 — same validation logic, applied from both sides.
+    """
+    prop = (
+        db.query(Property)
+        .filter(Property.id == action["property_id"], Property.game_id == game.id)
+        .first()
+    )
+    if prop is None:
+        return None
+
+    atype = action.get("type")
+    if atype == "buy":
+        if prop.owner_id is not None or not prop.is_listed:
+            return None
+        if rival.cash < prop.market_value:
+            return None
+        rival.cash -= prop.market_value
+        prop.owner_id = rival.id
+        prop.is_listed = False
+        prop.expiry_turn = None
+        prop.is_flipper_target = False
+        prop.flipper_acquire_turn = None
+        return {
+            "actor": rival.role,
+            "action": "buy",
+            "property": prop.name,
+            "price": prop.market_value,
+            "turn": game.turn,
+        }
+
+    if atype == "sell":
+        if prop.owner_id != rival.id:
+            return None
+        rival.cash += prop.market_value
+        prop.owner_id = None
+        prop.is_listed = True
+        prop.expiry_turn = game.turn + config.PROPERTY_EXPIRY_TURNS if hasattr(config, "PROPERTY_EXPIRY_TURNS") else game.turn + 5
+        return {
+            "actor": rival.role,
+            "action": "sell",
+            "property": prop.name,
+            "price": prop.market_value,
+            "turn": game.turn,
+        }
+
+    return None
