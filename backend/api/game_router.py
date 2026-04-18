@@ -122,6 +122,8 @@ def get_status(session_id: str, db: Session = Depends(get_db)):
                 "unlock_turn": p.unlock_turn,
                 "expiry_turn": p.expiry_turn,
                 "sprite_key": p.sprite_key,
+                "is_flipper_target": p.is_flipper_target,
+                "flipper_acquire_turn": p.flipper_acquire_turn,
             }
             for p in props
         ],

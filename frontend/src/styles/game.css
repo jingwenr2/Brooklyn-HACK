@@ -227,6 +227,61 @@
   pointer-events: none;
 }
 
+/* Ownership borders — gold = YOU, orange = Flipper */
+.tile--owned-you .tile__base {
+  background: var(--color-gold);
+  opacity: 0.75;
+}
+.tile--owned-you .tile__tier { color: var(--color-gold); }
+
+.tile--owned-rival .tile__base {
+  background: var(--color-orange);
+  opacity: 0.75;
+}
+.tile--owned-rival .tile__tier { color: var(--color-orange); }
+
+.tile--selected {
+  outline: 2px solid var(--color-text-main);
+  outline-offset: -2px;
+}
+
+/* Tile badges (top corners) */
+.tile__badge {
+  position: absolute;
+  top: 6px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  line-height: 1;
+  padding: 4px 5px;
+  border: 2px solid var(--color-bg-deep);
+  background: var(--color-panel-bg);
+  color: var(--color-text-main);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tile__badge--expiry {
+  left: 6px;
+  background: var(--color-copper);
+  color: var(--color-bg-deep);
+  min-width: 14px;
+  text-align: center;
+}
+
+.tile__badge--expiry.tile__badge--danger {
+  background: var(--color-danger);
+  color: var(--color-text-main);
+  animation: pulse-soft 1s ease-in-out infinite;
+}
+
+.tile__badge--eyes {
+  right: 6px;
+  background: var(--color-orange);
+  border-color: var(--color-bg-deep);
+  font-size: 10px;
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
 /* ============================================================ Dice modal */
 
 .dice-overlay {
