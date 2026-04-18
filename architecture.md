@@ -18,7 +18,7 @@ Mogul Blocks is a single-player real estate tycoon web game where pop culture kn
 │  • Turn Controls                 │   WS    │  • Catalyst / Trivia Engine           │
 │  • Trivia Modal                  │         │  • Finance System                     │
 │  • Portfolio Dashboard           │         │  • Auction Resolver                   │
-│  • Sprite Animations             │         │  • Bluff / Signal System              │
+│  • CSS Pixel Animations           │         │  • Bluff / Signal System              │
 └──────────────────────────────────┘         └───────────────────────────────────────┘
                                                         │
                                                         ▼
@@ -36,7 +36,7 @@ Mogul Blocks is a single-player real estate tycoon web game where pop culture kn
 | **Client–Server over pure client-side** | Python backend enables AI logic in Python, server-authoritative game state prevents cheating, cleanly separates concerns for future multiplayer |
 | **FastAPI** | Async-capable, auto-generates OpenAPI docs, fast for prototyping, Python-native |
 | **React + Vite + TypeScript** | Component architecture maps to game panels. Vite provides instant HMR. TypeScript catches state bugs early |
-| **Pixel Art** | On-brand for Pixel Park theme, retro aesthetic appeals to 18–28 demographic, sprite sheets enable animated property upgrades |
+| **Pixel Art** | On-brand for Pixel Park theme, retro aesthetic appeals to 18–28 demographic. Single static sprite per property + CSS star overlays for dev levels |
 | **REST + WebSocket hybrid** | REST for player actions. WebSocket for real-time push events (catalyst reveals, AI moves, auction countdowns) |
 | **SQLite** | Zero-config, file-based, handles save/resume for single-player. Swap to PostgreSQL in Phase 3 (multiplayer) |
 
@@ -208,7 +208,7 @@ Start of Turn
 
 ### 3. Property Listing Manager (`game_engine/listings.py`)
 
-Controls property availability via a drip-feed schedule. The board always shows all 10 tile slots — unlocked ones show the property, locked ones show a "???" tile. Players can see how many slots remain but not what's coming.
+Controls property availability via a drip-feed schedule. The board shows **all 10 property plots from turn 1** — unavailable properties are **grayed out** (CSS `filter: grayscale(1); opacity: 0.5`). Players can see the full board layout but can only interact with unlocked (colored) tiles.
 
 **Unlock schedule:**
 
@@ -223,11 +223,11 @@ Controls property availability via a drip-feed schedule. The board always shows 
 | 15 | +1 | 9 | **premium** |
 | 18 | +1 | 10 | budget (last) |
 
-**Property expiry:** Each listing has a 3-turn expiry timer starting when it unlocks. If nobody buys it (player or Flipper) within 3 turns, the tile relocks as "???" and the property is gone for the rest of the game.
+**Property expiry:** Each listing has a 5-turn expiry timer starting when it unlocks. If nobody buys it (player or Flipper) within 5 turns, the tile goes gray again and the property is gone for the rest of the game.
 
-Each unlock fires a `new_listing` WebSocket event with a tile-reveal animation on the client. The unlock is a moment — not a silent state update.
+**Visual unlock:** When a property unlocks, the grayed-out tile transitions to full color via CSS animation (`filter: grayscale(0); opacity: 1` with a scale pop `1.0 -> 1.1 -> 1.0`). The unlock is a visual moment — not a silent state update.
 
-Starting cash of $22K means turn-1 budget properties ($12–15K) are reachable; the turn-1 mid-range ($28K) is not — players have to earn their way to it.
+Starting cash of $22K means turn-1 budget properties ($5-9K) are reachable; the turn-1 mid-range ($13K) requires saving rental income first.
 
 ---
 
@@ -627,7 +627,7 @@ Dismissed individually. Never shown again after first game.
     │   │
     │   ├── ── GAME BOARD (center, dominant) ──
     │   ├── <DistrictBoard>      ← Pixel art property grid (main game board)
-    │   │   └── <PropertyTile>   ← Animated sprite; heat indicator; owner badge
+    │   │   └── <PropertyTile>   ← Single sprite + CSS star overlay + heat bar + owner badge
     │   │
     │   ├── ── LEFT PANEL ──
     │   ├── <PlayerCard>         ← "YOU" — cash, owned count, net worth, AP remaining
@@ -684,9 +684,9 @@ Before spending any AP each turn, you can taunt, bluff, or call out your rival. 
 ┌─────────────────────────────┐
 │  💬 TRASH TALK              │
 │─────────────────────────────│
-│ FLIPPER  *bought Cloud9*    │
+│ FLIPPER  *bought Trade Center*│
 │ YOU      "Back off my turf" │
-│ FLIPPER  *bought LAN House* │
+│ FLIPPER  *bought Signal Tower*│
 │─────────────────────────────│
 │ [Say something...]     [↵]  │
 │  free   │
@@ -701,47 +701,81 @@ Before spending any AP each turn, you can taunt, bluff, or call out your rival. 
 
 > **Why "Trash Talk" not "Signal Market":** Every player immediately understands talking trash to a rival. The underlying mechanic (bluffing, misdirection) is discovered through play. Name the experience, not the mechanic.
 
-### Visual Style: Pixel Art + Animations
+### Visual Style: Pixel Art + CSS Animations
 
-**Property sprites — 4 states per property:**
-- **Vacant lot** (Level 0): Empty pixel art tile with "For Sale" sign
-- **Basic building** (Level 1): Simple structure, 2-frame idle animation (lights flicker)
-- **Upgraded building** (Level 2): Taller structure with signage, 3-frame animation (people walking in/out)
-- **Flagship building** (Level 3): Premium structure with neon, 4-frame animation (bustling activity, particle effects)
+**Design language:** The entire frontend uses a pixel art aesthetic:
+- `image-rendering: pixelated` globally for crisp scaling
+- Pixel font (Press Start 2P from Google Fonts)
+- Hard-edged borders, no `border-radius`
+- Limited color palette: cyberpunk-retro (deep purples, electric blues, neon greens, warm oranges)
+- All UI panels use 1px solid borders with subtle pixel noise backgrounds
 
-**Transition animations between levels:**
-- Construction dust cloud (3 frames) → reveal new building sprite
-- These are simple sprite sheet frame swaps, not full skeletal animations
+**Board layout -- Staggered isometric grid:**
 
-**Catalyst event animations:**
-- Boom event: district tiles glow green, rent numbers animate upward
-- Bust event: district tiles flash red, rain/storm overlay
+The game board uses a repeating isometric tile (`board_bg.svg`). Because the board tile asset is relatively small (four plot sections), the frontend will render a larger dark surface matching the background color (`#140E06`) and place the 10 property tiles in a staggered 3-4-3 diamond grid layout. The board SVG will be positioned underneath the property tiles to provide road texture, and can be tiled/repeated as needed.
 
-**Sprite asset count (MVP — 1 district, 10 properties):**
+All 10 property plots are visible from turn 1. Unavailable properties are grayed out (`filter: grayscale(1); opacity: 0.5`). When unlocked, tiles animate to full color.
 
-| Asset Type | Count | Frames Each | Total Frames |
-|---|---|---|---|
-| Property sprites (4 levels × 10) | 40 | 2-4 | ~120 |
-| Level-up transitions | 30 | 3 | 90 |
-| UI elements (buttons, panels) | ~15 | 1 | 15 |
-| AI rival portrait | 1 | 2 | 2 |
-| District effects (boom/bust) | 2 | 4 | 8 |
-| **Total** | | | **~235 frames** |
+**Property tile anatomy:**
 
-**Art Pipeline: AI-Generated Pixel Art**
+```
++---------------------+
+|  [Property Sprite]  |  <-- Single 32x32 or 64x64 pixel art image (1 per property)
+|                     |
+|  ***-              |  <-- Pixel art star icons rendered via CSS (dev level)
+|  $6,000   YOU      |  <-- Price + owner badge (CSS text)
+|  T:3               |  <-- Expiry countdown (CSS badge)
+|  (eyes)            |  <-- Flipper interest (CSS icon, shown conditionally)
++---------------------+
+```
 
-Sprites will be generated using AI image tools (DALL-E, Midjourney, or Stable Diffusion) with manual cleanup in Aseprite or Piskel.
+**Property sprites -- 1 static image per property:**
+- Each property has ONE pixel art building image (no level variants)
+- Development level is shown via **pixel art star overlay** (filled gold, empty gray)
+- The star is a single ~8x8 pixel art icon, repeated via CSS
+- Stars appear via CSS scale-in animation when a property is developed
+
+**All animations are CSS/canvas -- zero sprite sheets:**
+
+| Effect | Implementation |
+|---|---|
+| **Idle bob** | CSS `@keyframes bob { translateY(-2px) }` on available tiles |
+| **Unlock reveal** | CSS `filter: grayscale(0)` transition + scale pop (1.0 -> 1.1 -> 1.0) |
+| **Purchase** | CSS border color change (blue=YOU, orange=FLIPPER) + owner badge slide-in |
+| **Development star** | Star icon scales from 0 -> 1 with CSS `transform: scale()` + gold sparkle (canvas particles) |
+| **Catalyst boom** | CSS `box-shadow: 0 0 20px green` glow + `translateX` shake |
+| **Catalyst bust** | CSS flash red + canvas rain particle overlay |
+| **Expiry countdown** | CSS badge number change + pulse animation on last turn |
+| **Bankruptcy warning** | CSS `border-color` pulse red animation |
+| **Cash danger** | CSS pulsing red border on entire UI |
+| **Dice roll** | CSS 3D rotate animation on a pixel die element |
+| **Auction gavel** | CSS rotate + slam animation on gavel icon |
+| **Tile goes gray (expired)** | CSS `filter: grayscale(1)` transition + fade |
+
+**Sprite asset count (MVP):**
+
+| Asset Type | Count | Notes |
+|---|---|---|
+| Property buildings | 10 | 1 static image each, AI-generated |
+| Star icon | 1 | 8x8 pixel art, filled + empty states |
+| Flipper portrait | 1 | For RivalCard |
+| Board background | 1 | Pixel art plot map / road grid |
+| **Total sprites** | **~13** | **Everything else is CSS/canvas** |
+
+**Art pipeline: AI-generated pixel art**
+
+Sprites are generated using AI image tools (DALL-E, Midjourney, or Stable Diffusion) with optional manual cleanup in Aseprite or Piskel.
 
 All sprites are catalogued in two files:
-- **[`sprites/sprite_registry.json`](file:///c:/Users/ds3/Documents/projects/2-Project%20Collabs/Brooklyn-HACK/sprites/sprite_registry.json)** — Maps every sprite name to its file path in the repo
-- **[`sprites/sprite_animations.md`](file:///c:/Users/ds3/Documents/projects/2-Project%20Collabs/Brooklyn-HACK/sprites/sprite_animations.md)** — Detailed frame-by-frame visual descriptions for every animation (serves as the AI generation prompt / artist brief)
+- **[`sprites/sprite_registry.json`](file:///c:/Users/ds3/Documents/projects/2-Project%20Collabs/Brooklyn-HACK/sprites/sprite_registry.json)** -- Maps every sprite name to its file path in the repo
+- **[`sprites/sprite_animations.md`](file:///c:/Users/ds3/Documents/projects/2-Project%20Collabs/Brooklyn-HACK/sprites/sprite_animations.md)** -- Visual descriptions for each property image (serves as the AI generation prompt)
 
 **Production workflow:**
 1. Use `sprite_animations.md` descriptions as prompts for AI image generation
-2. Generate 32×32 sprites per the descriptions
-3. Clean up in Aseprite (fix pixel alignment, apply 16-color palette constraint)
-4. Export as horizontal sprite strips (32px × N frames)
-5. Place files at the paths specified in `sprite_registry.json`
+2. Generate 32x32 or 64x64 sprites per the descriptions
+3. Optional cleanup in Aseprite (fix pixel alignment, apply 16-color palette)
+4. Place files at the paths specified in `sprite_registry.json`
+5. All animations, effects, and overlays are implemented in CSS/canvas -- no sprite sheets needed
 
 ### Frontend Tech Stack
 
@@ -1012,7 +1046,7 @@ Answer: **No.** The math shows $75K starting cash is self-balancing across all p
 @dataclass
 class Property:
     id: str
-    name: str                        # "Pixel Lofts", "Arcade Tower"
+    name: str                        # "Startup Lofts", "Mogul Tower"
     district: str                    # "pixel_park"
     base_value: int                  # Base price at game start
     market_value: int                # Current value (shifts with catalysts)
@@ -1134,25 +1168,27 @@ mogul-blocks/
 │   │   │   ├── PauseMenu.tsx
 │   │   │   ├── GameOverScreen.tsx
 │   │   │   └── TutorialOverlay.tsx  # Spotlight + tooltip for in-game hints
-│   │   ├── sprites/                 # ★ Pixel art assets
-│   │   │   ├── properties/          # Per-property sprite sheets
-│   │   │   ├── effects/             # Boom/bust overlays
-│   │   │   ├── ui/                  # Buttons, panels, icons
-│   │   │   └── rivals/              # AI portrait sprites
-│   │   ├── styles/
-│   │   │   ├── global.module.css
-│   │   │   └── pixel.css            # image-rendering: pixelated, retro fonts
-│   │   ├── types/
-│   │   │   └── game.ts
-│   │   └── utils/
-│   │       ├── format.ts            # Currency formatting
-│   │       └── spriteAnimator.ts    # Sprite sheet frame management
+    │   │   ├── assets/                  # Pixel art images (static, no sprite sheets)
+    │   │   │   ├── properties/          # 10 building images (1 per property)
+    │   │   │   ├── star_filled.svg      # 8x8 star icon (gold)
+    │   │   │   ├── star_empty.svg       # 8x8 star icon (gray)
+    │   │   │   ├── board_bg.svg         # Board background (plot grid)
+    │   │   │   └── flipper.svg          # Flipper portrait
+    │   │   ├── styles/
+    │   │   │   ├── global.module.css
+    │   │   │   ├── pixel.css            # image-rendering: pixelated, retro fonts
+    │   │   │   └── animations.css       # All CSS keyframe animations
+    │   │   ├── types/
+    │   │   │   └── game.ts
+    │   │   └── utils/
+    │   │       ├── format.ts            # Currency formatting
+    │   │       └── particles.ts         # Canvas particle effects (sparkles, rain)
 │   └── public/
 │       └── fonts/                   # Pixel/retro fonts
 │
 ├── sprites/
 │   ├── sprite_registry.json         # ★ Sprite name → file path mapping
-│   └── sprite_animations.md         # ★ Frame-by-frame art descriptions
+│   └── sprite_animations.md         # Property image descriptions (AI gen prompts)
 ├── plan.md
 ├── architecture.md
 └── README.md
@@ -1206,7 +1242,7 @@ Phase 2 transforms the MVP from a proof-of-concept into the full game vision.
 | AI Engine | Add `builder.py`, `analyst.py`, `shark.py` strategies. Plug into existing `RivalStrategy` ABC |
 | Bluff System | Add credibility decay, counter-signaling support, Analyst trust-weight tracking |
 | Catalyst Engine | Expand `templates.json` with district-specific templates. No code changes |
-| Frontend | New district tiles, rival portraits, Trade/Sabotage UI modals. ~150 new sprite frames |
+| Frontend | New district property images (~50 static sprites), rival portraits, Trade/Sabotage UI modals. All animations remain CSS/canvas |
 | Config | Add balance values for new actions, rival behaviors, district modifiers |
 
 ### Signaling Evolution in Phase 2
@@ -1283,8 +1319,8 @@ AI auction bids have ±10% randomness (down from ±20%). This makes AI bidding b
 | # | Question | Resolution |
 |---|---|---|
 | 1 | Trivia content source | **AI-generated via GPT-4o-mini** ($0.001/game). Offline JSON fallback. |
-| 2 | Visual style | **Pixel art.** AI-generated sprites, catalogued in `sprite_registry.json` + `sprite_animations.md`. |
-| 3 | Property upgrade visuals | **Animated.** 4 states per property with transition animations. ~235 frames total for MVP. |
+| 2 | Visual style | **Pixel art.** 1 static sprite per property + CSS star overlays. All animations are CSS/canvas. ~13 total sprites for MVP. |
+| 3 | Property upgrade visuals | **Star overlay.** Pixel art stars rendered via CSS. No level-specific sprites. Development adds stars with scale-in animation. |
 | 4 | Turn end trigger | **Both.** Fixed 20 turns OR $500K net worth after turn 10 with ≥3 properties. Math verified: impossible to cheese. |
 | 5 | Bankruptcy | **Debt limit.** Warning at 80% LTV, game over at 100% LTV. Forced liquidation if player doesn't sell. |
 | 6 | Bluffing | **Yes for MVP.** Free pre-turn announcement, Flipper reacts. Expands in Phase 2 with credibility tracking + counter-signals. |

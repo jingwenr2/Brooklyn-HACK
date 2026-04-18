@@ -241,9 +241,9 @@ The game never says "here is a lesson on comparable analysis." It says "you earn
 
 ## Dynamic Property Unlocks
 
-The board doesn't start full. Properties unlock in waves, making the board feel alive and creating new decision points mid-game.
+The board shows **all 10 property plots from turn 1** arranged in a staggered 3-4-3 isometric diamond grid. Unavailable properties are **grayed out** — players can see the full layout but can only interact with unlocked (colored) tiles. Properties unlock in waves, un-graying as they become available.
 
-**Starting state:** 3 properties visible (2 budget, 1 mid). The rest of the board shows locked tiles — players can see *slots* but not what's coming.
+**Starting state:** All 10 tiles visible, 3 in full color (2 budget, 1 mid), 7 grayed out.
 
 **Unlock schedule (hardcoded, 10 total properties):**
 
@@ -259,10 +259,10 @@ The board doesn't start full. Properties unlock in waves, making the board feel 
 | 18 | +1 | 10 | 1 budget (final listing) |
 
 **Why this creates tension:**
-- Players can't buy what isn't listed yet. The locked slots create anticipation.
+- Players can see what's coming (grayed-out buildings are visible), creating FOMO and save-vs-spend pressure.
 - The first premium property arrives at turn 9 — by then players have had time to save but may have spent on earlier properties. The reveal is a decision point: "Do I have enough to compete with Flipper for this?"
-- Each unlock is a visual moment on the board: the locked tile animates open.
-- Combined with property expiry (3 turns), unlocked properties feel precious.
+- Each unlock is a visual moment: the tile animates from gray to full color with a scale pop effect.
+- Combined with property expiry (5 turns), unlocked properties feel precious.
 
 **Multiplayer note:** Hardcoded schedule works for 1–2 players. Adjust unlock density for more players if multiplayer is added later.
 
@@ -352,13 +352,14 @@ Young, culturally plugged-in people (18-28) who are curious about finance but wi
 
 ## Technical Stack (Recommended)
 
-- **Frontend**: React (single-page app, component-based UI)
-- **Styling**: Tailwind CSS
-- **State management**: React useState/useReducer (no external state library needed for MVP)
+- **Backend**: Python FastAPI (server-authoritative game state)
+- **Frontend**: React + Vite + TypeScript (single-page app)
+- **Visual style**: Pixel art — 1 static sprite per property, CSS star overlays for dev levels, all animations CSS/canvas
+- **State management**: Zustand
 - **AI rival logic**: Simple decision trees, no ML needed
-- **Trivia/catalyst engine**: JSON template system with randomization
-- **Hosting**: Vercel or Netlify (free tier sufficient for MVP)
-- **No backend needed for MVP** — all game logic runs client-side
+- **Trivia/catalyst engine**: AI-generated via GPT-4o-mini with JSON fallback
+- **Database**: SQLite for save/resume
+- **Hosting**: Render/Railway (backend) + Vercel/Netlify (frontend)
 
 ---
 

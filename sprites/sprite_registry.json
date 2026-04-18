@@ -1,278 +1,118 @@
 {
     "meta": {
-        "version": "1.0",
-        "description": "Maps sprite names to file locations in the repository. Each key is a logical sprite identifier used in code, and the value is the relative path from the frontend/src/ directory.",
-        "format": "Sprite sheets are horizontal strips. Each frame is 32x32 pixels. Idle animations loop. Transition animations play once."
+        "version": "2.0",
+        "description": "Maps sprite names to file locations in the repository. Each key is a logical sprite identifier used in code, and the value contains the relative path from the project root.",
+        "format": "Single static isometric images. No sprite sheets. All animations handled by CSS/canvas.",
+        "total_sprites": 13,
+        "source_pack": "Monocolor Buildings (Isometric) - Free, 400x400px PNGs"
     },
 
     "properties": {
-        "pixel_lofts": {
-            "name": "Pixel Lofts",
-            "description": "Small apartment complex for indie developers",
+        "startup_lofts": {
+            "name": "Startup Lofts",
+            "description": "Small, narrow office tower — incubator for early-stage startups",
             "tier": "budget",
-            "sprites": {
-                "level_0":        "sprites/properties/pixel_lofts/level_0.png",
-                "level_0_idle":   "sprites/properties/pixel_lofts/level_0_idle.png",
-                "level_1":        "sprites/properties/pixel_lofts/level_1.png",
-                "level_1_idle":   "sprites/properties/pixel_lofts/level_1_idle.png",
-                "level_2":        "sprites/properties/pixel_lofts/level_2.png",
-                "level_2_idle":   "sprites/properties/pixel_lofts/level_2_idle.png",
-                "level_3":        "sprites/properties/pixel_lofts/level_3.png",
-                "level_3_idle":   "sprites/properties/pixel_lofts/level_3_idle.png",
-                "transition_0_1": "sprites/properties/pixel_lofts/transition_0_1.png",
-                "transition_1_2": "sprites/properties/pixel_lofts/transition_1_2.png",
-                "transition_2_3": "sprites/properties/pixel_lofts/transition_2_3.png"
-            }
+            "base_value": 6000,
+            "sprite": "sprites/properties/startup_lofts.png",
+            "source_file": "(058).png"
         },
-        "arcade_tower": {
-            "name": "Arcade Tower",
-            "description": "Retro arcade and gaming lounge",
+        "trade_center": {
+            "name": "Trade Center",
+            "description": "Medium glass-front office — commodities and trade exchange hub",
             "tier": "budget",
-            "sprites": {
-                "level_0":        "sprites/properties/arcade_tower/level_0.png",
-                "level_0_idle":   "sprites/properties/arcade_tower/level_0_idle.png",
-                "level_1":        "sprites/properties/arcade_tower/level_1.png",
-                "level_1_idle":   "sprites/properties/arcade_tower/level_1_idle.png",
-                "level_2":        "sprites/properties/arcade_tower/level_2.png",
-                "level_2_idle":   "sprites/properties/arcade_tower/level_2_idle.png",
-                "level_3":        "sprites/properties/arcade_tower/level_3.png",
-                "level_3_idle":   "sprites/properties/arcade_tower/level_3_idle.png",
-                "transition_0_1": "sprites/properties/arcade_tower/transition_0_1.png",
-                "transition_1_2": "sprites/properties/arcade_tower/transition_1_2.png",
-                "transition_2_3": "sprites/properties/arcade_tower/transition_2_3.png"
-            }
+            "base_value": 7000,
+            "sprite": "sprites/properties/trade_center.png",
+            "source_file": "(049).png"
         },
-        "neon_garage": {
-            "name": "Neon Garage",
-            "description": "Underground indie game studio and co-working space",
+        "signal_tower": {
+            "name": "Signal Tower",
+            "description": "Tall industrial tower with smokestack — broadcast and data center",
             "tier": "budget",
-            "sprites": {
-                "level_0":        "sprites/properties/neon_garage/level_0.png",
-                "level_0_idle":   "sprites/properties/neon_garage/level_0_idle.png",
-                "level_1":        "sprites/properties/neon_garage/level_1.png",
-                "level_1_idle":   "sprites/properties/neon_garage/level_1_idle.png",
-                "level_2":        "sprites/properties/neon_garage/level_2.png",
-                "level_2_idle":   "sprites/properties/neon_garage/level_2_idle.png",
-                "level_3":        "sprites/properties/neon_garage/level_3.png",
-                "level_3_idle":   "sprites/properties/neon_garage/level_3_idle.png",
-                "transition_0_1": "sprites/properties/neon_garage/transition_0_1.png",
-                "transition_1_2": "sprites/properties/neon_garage/transition_1_2.png",
-                "transition_2_3": "sprites/properties/neon_garage/transition_2_3.png"
-            }
+            "base_value": 8000,
+            "sprite": "sprites/properties/signal_tower.png",
+            "source_file": "(037).png"
         },
-        "cloud9_plaza": {
-            "name": "Cloud9 Plaza",
-            "description": "Cloud computing and SaaS startup hub",
+        "market_block": {
+            "name": "Market Block",
+            "description": "Midrise on a platform base — mixed-use retail and office space",
             "tier": "budget",
-            "sprites": {
-                "level_0":        "sprites/properties/cloud9_plaza/level_0.png",
-                "level_0_idle":   "sprites/properties/cloud9_plaza/level_0_idle.png",
-                "level_1":        "sprites/properties/cloud9_plaza/level_1.png",
-                "level_1_idle":   "sprites/properties/cloud9_plaza/level_1_idle.png",
-                "level_2":        "sprites/properties/cloud9_plaza/level_2.png",
-                "level_2_idle":   "sprites/properties/cloud9_plaza/level_2_idle.png",
-                "level_3":        "sprites/properties/cloud9_plaza/level_3.png",
-                "level_3_idle":   "sprites/properties/cloud9_plaza/level_3_idle.png",
-                "transition_0_1": "sprites/properties/cloud9_plaza/transition_0_1.png",
-                "transition_1_2": "sprites/properties/cloud9_plaza/transition_1_2.png",
-                "transition_2_3": "sprites/properties/cloud9_plaza/transition_2_3.png"
-            }
+            "base_value": 9000,
+            "sprite": "sprites/properties/market_block.png",
+            "source_file": "(108).png"
         },
-        "lan_house": {
-            "name": "LAN House",
-            "description": "Esports café and competitive gaming venue",
+        "venture_place": {
+            "name": "Venture Place",
+            "description": "Ornate stepped-back tower — VC firms and fintech offices",
             "tier": "mid",
-            "sprites": {
-                "level_0":        "sprites/properties/lan_house/level_0.png",
-                "level_0_idle":   "sprites/properties/lan_house/level_0_idle.png",
-                "level_1":        "sprites/properties/lan_house/level_1.png",
-                "level_1_idle":   "sprites/properties/lan_house/level_1_idle.png",
-                "level_2":        "sprites/properties/lan_house/level_2.png",
-                "level_2_idle":   "sprites/properties/lan_house/level_2_idle.png",
-                "level_3":        "sprites/properties/lan_house/level_3.png",
-                "level_3_idle":   "sprites/properties/lan_house/level_3_idle.png",
-                "transition_0_1": "sprites/properties/lan_house/transition_0_1.png",
-                "transition_1_2": "sprites/properties/lan_house/transition_1_2.png",
-                "transition_2_3": "sprites/properties/lan_house/transition_2_3.png"
-            }
+            "base_value": 12000,
+            "sprite": "sprites/properties/venture_place.png",
+            "source_file": "(082).png"
         },
-        "byte_market": {
-            "name": "Byte Market",
-            "description": "Tech marketplace and hardware shop",
+        "capital_square": {
+            "name": "Capital Square",
+            "description": "Large corporate tower with rooftop terrace — institutional headquarters",
             "tier": "mid",
-            "sprites": {
-                "level_0":        "sprites/properties/byte_market/level_0.png",
-                "level_0_idle":   "sprites/properties/byte_market/level_0_idle.png",
-                "level_1":        "sprites/properties/byte_market/level_1.png",
-                "level_1_idle":   "sprites/properties/byte_market/level_1_idle.png",
-                "level_2":        "sprites/properties/byte_market/level_2.png",
-                "level_2_idle":   "sprites/properties/byte_market/level_2_idle.png",
-                "level_3":        "sprites/properties/byte_market/level_3.png",
-                "level_3_idle":   "sprites/properties/byte_market/level_3_idle.png",
-                "transition_0_1": "sprites/properties/byte_market/transition_0_1.png",
-                "transition_1_2": "sprites/properties/byte_market/transition_1_2.png",
-                "transition_2_3": "sprites/properties/byte_market/transition_2_3.png"
-            }
+            "base_value": 14000,
+            "sprite": "sprites/properties/capital_square.png",
+            "source_file": "(084).png"
         },
-        "polygon_heights": {
-            "name": "Polygon Heights",
-            "description": "VR/AR and 3D modeling studio complex",
+        "exchange_tower": {
+            "name": "Exchange Tower",
+            "description": "Art-deco tower with decorative crown — stock and digital asset exchange",
             "tier": "mid",
-            "sprites": {
-                "level_0":        "sprites/properties/polygon_heights/level_0.png",
-                "level_0_idle":   "sprites/properties/polygon_heights/level_0_idle.png",
-                "level_1":        "sprites/properties/polygon_heights/level_1.png",
-                "level_1_idle":   "sprites/properties/polygon_heights/level_1_idle.png",
-                "level_2":        "sprites/properties/polygon_heights/level_2.png",
-                "level_2_idle":   "sprites/properties/polygon_heights/level_2_idle.png",
-                "level_3":        "sprites/properties/polygon_heights/level_3.png",
-                "level_3_idle":   "sprites/properties/polygon_heights/level_3_idle.png",
-                "transition_0_1": "sprites/properties/polygon_heights/transition_0_1.png",
-                "transition_1_2": "sprites/properties/polygon_heights/transition_1_2.png",
-                "transition_2_3": "sprites/properties/polygon_heights/transition_2_3.png"
-            }
+            "base_value": 16000,
+            "sprite": "sprites/properties/exchange_tower.png",
+            "source_file": "(125).png"
         },
-        "circuit_square": {
-            "name": "Circuit Square",
-            "description": "Chip design and hardware engineering campus",
+        "metro_spire": {
+            "name": "Metro Spire",
+            "description": "Dual-tone high-rise — premium mixed-use with luxury penthouse",
             "tier": "mid",
-            "sprites": {
-                "level_0":        "sprites/properties/circuit_square/level_0.png",
-                "level_0_idle":   "sprites/properties/circuit_square/level_0_idle.png",
-                "level_1":        "sprites/properties/circuit_square/level_1.png",
-                "level_1_idle":   "sprites/properties/circuit_square/level_1_idle.png",
-                "level_2":        "sprites/properties/circuit_square/level_2.png",
-                "level_2_idle":   "sprites/properties/circuit_square/level_2_idle.png",
-                "level_3":        "sprites/properties/circuit_square/level_3.png",
-                "level_3_idle":   "sprites/properties/circuit_square/level_3_idle.png",
-                "transition_0_1": "sprites/properties/circuit_square/transition_0_1.png",
-                "transition_1_2": "sprites/properties/circuit_square/transition_1_2.png",
-                "transition_2_3": "sprites/properties/circuit_square/transition_2_3.png"
-            }
+            "base_value": 18000,
+            "sprite": "sprites/properties/metro_spire.png",
+            "source_file": "(008).png"
         },
-        "streaming_station": {
-            "name": "Streaming Station",
-            "description": "Content creator HQ and streaming platform office",
+        "mogul_tower": {
+            "name": "Mogul Tower",
+            "description": "Red-brick heritage tower with dome — the flagship Mogul Blocks property",
             "tier": "premium",
-            "sprites": {
-                "level_0":        "sprites/properties/streaming_station/level_0.png",
-                "level_0_idle":   "sprites/properties/streaming_station/level_0_idle.png",
-                "level_1":        "sprites/properties/streaming_station/level_1.png",
-                "level_1_idle":   "sprites/properties/streaming_station/level_1_idle.png",
-                "level_2":        "sprites/properties/streaming_station/level_2.png",
-                "level_2_idle":   "sprites/properties/streaming_station/level_2_idle.png",
-                "level_3":        "sprites/properties/streaming_station/level_3.png",
-                "level_3_idle":   "sprites/properties/streaming_station/level_3_idle.png",
-                "transition_0_1": "sprites/properties/streaming_station/transition_0_1.png",
-                "transition_1_2": "sprites/properties/streaming_station/transition_1_2.png",
-                "transition_2_3": "sprites/properties/streaming_station/transition_2_3.png"
-            }
+            "base_value": 28000,
+            "sprite": "sprites/properties/mogul_tower.png",
+            "source_file": "(130).png"
         },
-        "boss_level_manor": {
-            "name": "Boss Level Manor",
-            "description": "Luxury gaming mansion and flagship tech campus",
+        "apex_plaza": {
+            "name": "Apex Plaza",
+            "description": "Tallest building on the board — rooftop antenna, executive suites, tech campus",
             "tier": "premium",
-            "sprites": {
-                "level_0":        "sprites/properties/boss_level_manor/level_0.png",
-                "level_0_idle":   "sprites/properties/boss_level_manor/level_0_idle.png",
-                "level_1":        "sprites/properties/boss_level_manor/level_1.png",
-                "level_1_idle":   "sprites/properties/boss_level_manor/level_1_idle.png",
-                "level_2":        "sprites/properties/boss_level_manor/level_2.png",
-                "level_2_idle":   "sprites/properties/boss_level_manor/level_2_idle.png",
-                "level_3":        "sprites/properties/boss_level_manor/level_3.png",
-                "level_3_idle":   "sprites/properties/boss_level_manor/level_3_idle.png",
-                "transition_0_1": "sprites/properties/boss_level_manor/transition_0_1.png",
-                "transition_1_2": "sprites/properties/boss_level_manor/transition_1_2.png",
-                "transition_2_3": "sprites/properties/boss_level_manor/transition_2_3.png"
-            }
-        }
-    },
-
-    "effects": {
-        "catalyst_boom": {
-            "description": "Green glow overlay played on district tiles when a positive catalyst hits",
-            "sprite": "sprites/effects/catalyst_boom.png",
-            "frames": 6,
-            "loop": false
-        },
-        "catalyst_bust": {
-            "description": "Red flash + rain overlay played on district tiles when a negative catalyst hits",
-            "sprite": "sprites/effects/catalyst_bust.png",
-            "frames": 6,
-            "loop": false
-        },
-        "auction_gavel": {
-            "description": "Gavel slam animation played when an auction is triggered",
-            "sprite": "sprites/effects/auction_gavel.png",
-            "frames": 4,
-            "loop": false
-        },
-        "milestone_unlock": {
-            "description": "Gold sparkle burst played when a finance tool is unlocked",
-            "sprite": "sprites/effects/milestone_unlock.png",
-            "frames": 8,
-            "loop": false
-        },
-        "bankruptcy_warning": {
-            "description": "Red pulsing border overlay on portfolio panel during LTV warning",
-            "sprite": "sprites/effects/bankruptcy_warning.png",
-            "frames": 4,
-            "loop": true
-        },
-        "purchase_confirm": {
-            "description": "Cash register / coin drop animation on successful purchase",
-            "sprite": "sprites/effects/purchase_confirm.png",
-            "frames": 5,
-            "loop": false
-        },
-        "research_reveal": {
-            "description": "Magnifying glass scan animation when intel is revealed",
-            "sprite": "sprites/effects/research_reveal.png",
-            "frames": 6,
-            "loop": false
-        },
-        "bluff_success": {
-            "description": "Poker chip flip animation when a bluff successfully misdirects AI",
-            "sprite": "sprites/effects/bluff_success.png",
-            "frames": 5,
-            "loop": false
+            "base_value": 38000,
+            "sprite": "sprites/properties/apex_plaza.png",
+            "source_file": "(163).png"
         }
     },
 
     "ui": {
-        "btn_buy":      "sprites/ui/btn_buy.png",
-        "btn_develop":  "sprites/ui/btn_develop.png",
-        "btn_research": "sprites/ui/btn_research.png",
-        "btn_end_turn": "sprites/ui/btn_end_turn.png",
-        "btn_pause":    "sprites/ui/btn_pause.png",
-        "btn_bluff":    "sprites/ui/btn_bluff.png",
-        "icon_ap":      "sprites/ui/icon_ap.png",
-        "icon_cash":    "sprites/ui/icon_cash.png",
-        "icon_debt":    "sprites/ui/icon_debt.png",
-        "icon_rent":    "sprites/ui/icon_rent.png",
-        "icon_intel":   "sprites/ui/icon_intel.png",
-        "panel_bg":     "sprites/ui/panel_bg.png",
-        "tooltip_bg":   "sprites/ui/tooltip_bg.png",
-        "heat_indicator": "sprites/ui/heat_indicator.png",
-        "listing_preview": "sprites/ui/listing_preview.png"
+        "star_filled": {
+            "description": "Gold pixel art star indicating one development level",
+            "sprite": "sprites/star_filled.svg",
+            "size": "8x8"
+        },
+        "star_empty": {
+            "description": "Dark gray pixel art star (empty development slot)",
+            "sprite": "sprites/star_empty.svg",
+            "size": "8x8"
+        },
+        "board_background": {
+            "description": "Isometric city block grid background for the game board",
+            "sprite": "sprites/board_bg.svg",
+            "size": "responsive"
+        }
     },
 
     "rivals": {
         "flipper": {
             "name": "The Flipper",
-            "idle":   "sprites/rivals/flipper_idle.png",
-            "action": "sprites/rivals/flipper_action.png",
-            "defeat": "sprites/rivals/flipper_defeat.png",
-            "portrait": "sprites/rivals/flipper_portrait.png"
-        }
-    },
-
-    "district": {
-        "pixel_park": {
-            "tile_base":   "sprites/district/pixel_park_tile.png",
-            "tile_boom":   "sprites/district/pixel_park_boom.png",
-            "tile_bust":   "sprites/district/pixel_park_bust.png",
-            "background":  "sprites/district/pixel_park_bg.png"
+            "portrait": "sprites/flipper.svg",
+            "description": "Gold jacket, dark sunglasses, smug expression. Used in RivalCard."
         }
     }
 }
