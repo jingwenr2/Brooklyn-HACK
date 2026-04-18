@@ -8,5 +8,9 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8000",
     },
+    fs: {
+      // Allow importing sprites from the repo root (../sprites)
+      allow: [".."],
+    },
   },
 });

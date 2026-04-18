@@ -1,0 +1,24 @@
+@keyframes dice-spin {
+  0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(720deg) rotateY(720deg) rotateZ(360deg); }
+}
+
+@keyframes tile-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+@keyframes tile-unlock {
+  0%   { transform: scale(1.15); filter: grayscale(0) brightness(1.4); }
+  100% { transform: scale(1); filter: grayscale(0) brightness(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
