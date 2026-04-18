@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import APDiceRoll from "../components/APDiceRoll";
 import DistrictBoard from "../components/DistrictBoard";
 import PlayerCard from "../components/PlayerCard";
@@ -7,19 +8,29 @@ import TopBar from "../components/TopBar";
 import { useGameStore } from "../store/gameStore";
 
 export default function GameScreen() {
+  const [searchParams] = useSearchParams();
+  const didInit = useRef(false);
   const ap = useGameStore((s) => s.ap);
   const selectedId = useGameStore((s) => s.selectedPropertyId);
   const listedIds = useGameStore((s) => s.listedPropertyIds);
   const ownedIds = useGameStore((s) => s.ownedPropertyIds);
   const loading = useGameStore((s) => s.loading);
   const initGame = useGameStore((s) => s.initGame);
+  const resumeGame = useGameStore((s) => s.resumeGame);
   const buyProperty = useGameStore((s) => s.buyProperty);
   const researchProperty = useGameStore((s) => s.researchProperty);
   const endTurn = useGameStore((s) => s.endTurn);
 
   // Initialize the game on first mount
   useEffect(() => {
-    initGame();
+    if (didInit.current) return;
+    didInit.current = true;
+
+    if (searchParams.get("resume") === "1") {
+      resumeGame();
+    } else {
+      initGame();
+    }
   }, []);
 
   const canAct = ap != null && ap >= 1 && selectedId != null && !loading;

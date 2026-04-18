@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { GridPos } from "../types/game";
+import { BASE_POSITIONS, shufflePositions } from "../data/properties";
 
 const API = "http://localhost:8000/api/game";
 const SESSION = "default_session"; // Single-player MVP
@@ -12,11 +14,14 @@ interface GameStore {
   ownedPropertyIds: string[];
   listedPropertyIds: string[];
   selectedPropertyId: string | null;
+  boardPositions: GridPos[];
+  unlockTurns: Record<string, number>;
   diceModalOpen: boolean;
   loading: boolean;
 
   // Actions
   initGame: () => Promise<void>;
+  resumeGame: () => Promise<void>;
   rollAP: () => Promise<void>;
   selectProperty: (id: string | null) => void;
   buyProperty: () => Promise<void>;
@@ -34,11 +39,33 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   ownedPropertyIds: [],
   listedPropertyIds: [],
   selectedPropertyId: null,
+  boardPositions: BASE_POSITIONS,
+  unlockTurns: {},
   diceModalOpen: false,
   loading: false,
 
   initGame: async () => {
-    set({ loading: true });
+    // Randomize the property spawns first so the UI instantly lays them out
+    const shuffled = shufflePositions(BASE_POSITIONS);
+    localStorage.setItem("mogul_blocks_positions", JSON.stringify(shuffled));
+    localStorage.setItem("mogul_blocks_save", "1");
+
+    set({
+      loading: true,
+      turn: 1,
+      ap: null,
+      cash: 22_000,
+      debt: 0,
+      netWorth: 22_000,
+      ownedPropertyIds: [],
+      listedPropertyIds: [],
+      selectedPropertyId: null,
+      unlockTurns: {},
+      boardPositions: shuffled,
+    });
+    
+    // Also store game ID so we can support multiple later
+    
     await fetch(`${API}/start/${SESSION}`, { method: "POST" });
     // Immediately start turn 1 to get AP + listings
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
@@ -52,12 +79,21 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     await get().refreshStatus();
   },
 
+  resumeGame: async () => {
+    set({ loading: true });
+    const saved = localStorage.getItem("mogul_blocks_positions");
+    if (saved) {
+      set({ boardPositions: JSON.parse(saved) });
+    }
+    await get().refreshStatus();
+    set({ loading: false });
+  },
+
   rollAP: async () => {
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
     const data = await res.json();
     set({
       ap: data.ap,
-      diceModalOpen: false,
     });
     await get().refreshStatus();
   },
@@ -141,6 +177,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       listedPropertyIds: data.properties
         .filter((p: any) => p.is_listed)
         .map((p: any) => p.id.replace(`${SESSION}_`, "")),
+      unlockTurns: data.properties.reduce((acc: Record<string, number>, p: any) => {
+        acc[p.id.replace(`${SESSION}_`, "")] = p.unlock_turn;
+        return acc;
+      }, {}),
     });
   },
 }));
