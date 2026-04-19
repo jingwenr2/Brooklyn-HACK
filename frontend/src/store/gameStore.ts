@@ -5,6 +5,35 @@ import { BASE_POSITIONS, shufflePositions } from "../data/properties";
 const API = "http://localhost:8000/api/game";
 const SESSION = "default_session"; // Single-player MVP
 
+let toastId = 0;
+
+export interface TriviaQuestion {
+  question: string;
+  options: string[];
+  questionId: string;
+  propertyId: string;
+}
+
+export interface GameOverData {
+  victory: boolean;
+  reason: string;
+  netWorth: number;
+  propertiesOwned: number;
+  turnsPlayed: number;
+}
+
+export interface Toast {
+  id: number;
+  message: string;
+  variant: "info" | "success" | "danger" | "warning";
+}
+
+export interface IntelEntry {
+  id: number;
+  turn: number;
+  message: string;
+}
+
 export type OwnerRole = "YOU" | "FLIPPER" | null;
 
 export interface PropertyMeta {
@@ -44,9 +73,22 @@ interface GameStore {
   rollAP: () => Promise<void>;
   selectProperty: (id: string | null) => void;
   buyProperty: () => Promise<void>;
+  developProperty: () => Promise<void>;
   researchProperty: () => Promise<void>;
   endTurn: () => Promise<void>;
   refreshStatus: () => Promise<void>;
+  // UI state
+  triviaOpen: boolean;
+  triviaQuestion: TriviaQuestion | null;
+  pauseOpen: boolean;
+  gameOverData: GameOverData | null;
+  toasts: Toast[];
+  setTriviaOpen: (open: boolean) => void;
+  setPauseOpen: (open: boolean) => void;
+  addToast: (message: string, variant?: Toast["variant"]) => void;
+  dismissToast: (id: number) => void;
+  intelLog: IntelEntry[];
+  addIntel: (message: string) => void;
 }
 
 export const useGameStore = create<GameStore>()((set, get) => ({
@@ -67,6 +109,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   unlockTurns: {},
   diceModalOpen: false,
   loading: false,
+  triviaOpen: false,
+  triviaQuestion: null,
+  pauseOpen: false,
+  gameOverData: null,
+  toasts: [],
+  intelLog: [],
 
   initGame: async () => {
     // Randomize the property spawns first so the UI instantly lays them out
@@ -150,6 +198,27 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     set({ loading: false });
   },
 
+  developProperty: async () => {
+    const { selectedPropertyId, ap } = get();
+    if (!selectedPropertyId || !ap || ap < 1) return;
+
+    set({ loading: true });
+    const res = await fetch(`${API}/${SESSION}/action/develop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ property_id: `${SESSION}_${selectedPropertyId}` }),
+    });
+
+    if (res.ok) {
+      get().addToast("Property developed! Rent increased.", "success");
+    } else {
+      const err = await res.json();
+      get().addToast(err.detail || "Cannot develop this property", "danger");
+    }
+    await get().refreshStatus();
+    set({ loading: false });
+  },
+
   researchProperty: async () => {
     const { selectedPropertyId, ap } = get();
     if (!selectedPropertyId || !ap || ap < 1) return;
@@ -163,10 +232,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
     if (res.ok) {
       const data = await res.json();
-      alert(`Intel on ${data.property}:\nValue: $${data.intel.market_value}\nRent/turn: $${data.intel.rent_per_turn}\nDev Level: ${data.intel.dev_level}`);
+      const msg = `${data.property} — Value $${data.intel.market_value}, Rent $${data.intel.rent_per_turn}/turn, Dev Lv${data.intel.dev_level}`;
+      get().addToast(`Intel: ${msg}`, "info");
+      get().addIntel(msg);
     } else {
       const err = await res.json();
-      alert(err.detail || "Research failed");
+      get().addToast(err.detail || "Research failed", "danger");
     }
     await get().refreshStatus();
     set({ loading: false });
@@ -178,7 +249,21 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const data = await res.json();
 
     if (data.game_over) {
-      alert(data.victory ? "🏆 MOGUL VICTORY! You win!" : "Game Over!");
+      set({
+        gameOverData: {
+          victory: Boolean(data.victory),
+          reason: data.victory ? "Mogul Victory!" : "Game Over",
+          netWorth: get().netWorth,
+          propertiesOwned: get().ownedPropertyIds.length,
+          turnsPlayed: get().turn,
+        },
+        loading: false,
+      });
+      return;
+    }
+
+    if (data.rent_collected) {
+      get().addToast(`Rent collected: $${data.rent_collected.toLocaleString()}`, "success");
     }
 
     set({
@@ -242,4 +327,24 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       }, {}),
     });
   },
+
+  setTriviaOpen: (open) => set({ triviaOpen: open }),
+  setPauseOpen: (open) => set({ pauseOpen: open }),
+
+  addToast: (message, variant = "info") => {
+    const id = ++toastId;
+    set((s) => ({ toasts: [...s.toasts, { id, message, variant }] }));
+    setTimeout(() => get().dismissToast(id), 4000);
+  },
+
+  dismissToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  addIntel: (message) =>
+    set((s) => ({
+      intelLog: [
+        { id: s.intelLog.length + 1, turn: s.turn, message },
+        ...s.intelLog,
+      ],
+    })),
 }));

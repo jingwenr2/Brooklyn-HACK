@@ -3,6 +3,7 @@ import { useGameStore } from "../store/gameStore";
 export default function TopBar() {
   const turn = useGameStore((s) => s.turn);
   const ap = useGameStore((s) => s.ap);
+  const setPauseOpen = useGameStore((s) => s.setPauseOpen);
 
   return (
     <header className="topbar">
@@ -12,7 +13,7 @@ export default function TopBar() {
       <span className="topbar__slot topbar__slot--center">
         AP: <span className="topbar__value">{ap ?? "—"}</span>
       </span>
-      <button className="topbar__pause" aria-label="Pause">
+      <button className="topbar__pause" aria-label="Pause" onClick={() => setPauseOpen(true)}>
         ||
       </button>
     </header>
