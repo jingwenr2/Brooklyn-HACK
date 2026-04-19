@@ -165,13 +165,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   rollAP: async () => {
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to roll Action Points");
     const data = await res.json();
     set({ ap: data.ap });
     await get().refreshStatus();
   },
 
   activateTimer: async () => {
-    await fetch(`${API}/${SESSION}/turn/activate_timer`, { method: "POST" });
+    const res = await fetch(`${API}/${SESSION}/turn/activate_timer`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to activate timer");
     await get().refreshStatus();
   },
 

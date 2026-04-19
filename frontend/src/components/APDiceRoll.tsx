@@ -32,16 +32,23 @@ export default function APDiceRoll() {
     setRolling(true);
     setResult(null);
 
-    // Call backend immediately so it's ready, but wait at least 1.4s for the visual spin
-    const rollPromise = rollAP();
-    const timerPromise = new Promise((resolve) => setTimeout(resolve, 1400));
-    
-    await Promise.all([rollPromise, timerPromise]);
+    try {
+      // Call backend immediately so it's ready, but wait at least 1.4s for the visual spin
+      const rollPromise = rollAP();
+      const timerPromise = new Promise((resolve) => setTimeout(resolve, 1400));
+      
+      await Promise.all([rollPromise, timerPromise]);
 
-    const ap = useGameStore.getState().ap;
-    setRolling(false);
-    setResult(ap);
-    setAutoProceedTime(3); // Start 3s countdown
+      const ap = useGameStore.getState().ap;
+      setRolling(false);
+      setResult(ap);
+      setAutoProceedTime(3); // Start 3s countdown
+    } catch (err) {
+      console.error("Dice roll failed:", err);
+      setRolling(false);
+      // addToast is available in store
+      useGameStore.getState().addToast("Connection error. Try rolling again.", "danger");
+    }
   };
 
   const proceed = async () => {
