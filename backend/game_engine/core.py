@@ -551,7 +551,7 @@ def sell_property(db: Session, game: GameState, player: Player, property_id: str
         return {"success": False, "error": "You don't own this property"}
 
     payout = int(prop.market_value * 0.9)
-    
+
     # Execute sale
     player.cash += payout
     prop.owner_id = None
@@ -584,6 +584,8 @@ def research_action(
       - Freezes the speed timer so the modal doesn't time out
       - AP is NOT deducted yet — that happens on answer submission
     """
+    from backend.game_engine.research import generate_question
+
     if time_err := _check_time(game): return time_err
 
     if game.current_ap < 1:

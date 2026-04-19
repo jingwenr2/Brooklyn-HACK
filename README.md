@@ -47,7 +47,7 @@ npm install
 # Start the Vite development server
 npm run dev
 ```
-*The frontend UI will be running at `http://localhost:5173`. Open this URL in your browser to play the game!*
+*The frontend UI will be running at `https://mogul-blocks-game.onrender.com/`. Open this URL in your browser to play the game!*
 
 ---
 
