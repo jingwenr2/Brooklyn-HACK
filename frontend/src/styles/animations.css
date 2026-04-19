@@ -4,8 +4,8 @@
 }
 
 @keyframes tile-bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-3px); }
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -3px; }
 }
 
 @keyframes tile-unlock {

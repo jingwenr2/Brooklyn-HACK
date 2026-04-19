@@ -87,6 +87,14 @@ def create_new_game(db: Session, session_id: str) -> GameState:
     )
     db.add_all([user, flipper])
 
+    # Group and shuffle unlock schedules by tier
+    unlocks_by_tier = {}
+    for bp in BLUEPRINTS:
+        unlocks_by_tier.setdefault(bp["tier"], []).append(bp["unlock"])
+        
+    for tier in unlocks_by_tier:
+        random.shuffle(unlocks_by_tier[tier])
+
     # Properties
     for bp in BLUEPRINTS:
         prop = Property(
@@ -102,7 +110,7 @@ def create_new_game(db: Session, session_id: str) -> GameState:
             dev_level=0,
             tenant_bonus=1.0,
             is_listed=False,
-            unlock_turn=bp["unlock"],
+            unlock_turn=unlocks_by_tier[bp["tier"]].pop(),
         )
         db.add(prop)
 
@@ -141,7 +149,7 @@ def start_turn(db: Session, game: GameState) -> dict:
     
     for prop in props:
         prop.is_listed = True
-        prop.expiry_turn = game.turn + BALANCE.PROPERTY_EXPIRY_TURNS
+        prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
         newly_listed.append(prop.id)
 
     # 3. Roll AP
@@ -264,6 +272,13 @@ def buy_property(db: Session, game: GameState, player: Player, property_id: str)
     prop = db.query(Property).filter(Property.id == property_id).first()
     if not prop:
         return {"success": False, "error": "Property not found"}
+    
+    # Safety: check if listing has technically already expired but not yet delisted
+    if prop.expiry_turn is not None and prop.expiry_turn < game.turn:
+        prop.is_listed = False
+        db.commit()
+        return {"success": False, "error": "Property listing has expired"}
+
     if not prop.is_listed:
         return {"success": False, "error": "Property is not currently listed"}
     if prop.owner_id is not None:

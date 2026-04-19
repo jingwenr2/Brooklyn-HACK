@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { GridPos } from "../types/game";
+import { BASE_POSITIONS, shufflePositions } from "../data/properties";
 
 const API = "http://localhost:8000/api/game";
 const SESSION = "default_session"; // Single-player MVP
@@ -23,15 +25,22 @@ interface GameStore {
   cash: number;
   debt: number;
   netWorth: number;
+  isBankrupt: boolean;
+  maxTurns: number;
+  flipperProps: number;
+  flipperCash: number;
   ownedPropertyIds: string[];
   listedPropertyIds: string[];
   propertyMeta: Record<string, PropertyMeta>;
   selectedPropertyId: string | null;
+  boardPositions: GridPos[];
+  unlockTurns: Record<string, number>;
   diceModalOpen: boolean;
   loading: boolean;
 
   // Actions
   initGame: () => Promise<void>;
+  resumeGame: () => Promise<void>;
   rollAP: () => Promise<void>;
   selectProperty: (id: string | null) => void;
   buyProperty: () => Promise<void>;
@@ -46,15 +55,41 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   cash: 22_000,
   debt: 0,
   netWorth: 22_000,
+  isBankrupt: false,
+  maxTurns: 20,
+  flipperProps: 0,
+  flipperCash: 0,
   ownedPropertyIds: [],
   listedPropertyIds: [],
   propertyMeta: {},
   selectedPropertyId: null,
+  boardPositions: BASE_POSITIONS,
+  unlockTurns: {},
   diceModalOpen: false,
   loading: false,
 
   initGame: async () => {
-    set({ loading: true });
+    // Randomize the property spawns first so the UI instantly lays them out
+    const shuffled = shufflePositions(BASE_POSITIONS);
+    localStorage.setItem("mogul_blocks_positions", JSON.stringify(shuffled));
+    localStorage.setItem("mogul_blocks_save", "1");
+
+    set({
+      loading: true,
+      turn: 1,
+      ap: null,
+      cash: 22_000,
+      debt: 0,
+      netWorth: 22_000,
+      ownedPropertyIds: [],
+      listedPropertyIds: [],
+      selectedPropertyId: null,
+      unlockTurns: {},
+      boardPositions: shuffled,
+    });
+
+    // Also store game ID so we can support multiple later
+
     await fetch(`${API}/start/${SESSION}`, { method: "POST" });
     // Immediately start turn 1 to get AP + listings
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
@@ -68,6 +103,16 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     await get().refreshStatus();
   },
 
+  resumeGame: async () => {
+    set({ loading: true });
+    const saved = localStorage.getItem("mogul_blocks_positions");
+    if (saved) {
+      set({ boardPositions: JSON.parse(saved) });
+    }
+    await get().refreshStatus();
+    set({ loading: false });
+  },
+
   rollAP: async () => {
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
     const data = await res.json();
@@ -78,8 +123,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   selectProperty: (id) => set({ selectedPropertyId: id }),
 
   buyProperty: async () => {
-    const { selectedPropertyId, ap } = get();
+    const { selectedPropertyId, ap, propertyMeta } = get();
     if (!selectedPropertyId || !ap || ap < 1) return;
+
+    // Frontend safety check
+    const meta = propertyMeta[selectedPropertyId];
+    if (!meta || !meta.listed) {
+      alert("This property is no longer available for purchase.");
+      return;
+    }
 
     set({ loading: true });
     const res = await fetch(`${API}/${SESSION}/action/buy`, {
@@ -171,6 +223,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       cash: data.player.cash,
       debt: data.player.debt,
       netWorth: data.player.net_worth,
+      isBankrupt: data.player.is_bankrupt,
+      maxTurns: data.max_turns,
+      flipperCash: data.flipper.cash,
+      flipperProps: data.properties.filter((p: any) => p.owner_id === flipperId).length,
       // Don't reveal AP while the dice modal is still up — let rollAP set it.
       ap: get().diceModalOpen ? get().ap : data.ap_remaining,
       propertyMeta: meta,
@@ -179,7 +235,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         .map((p: any) => strip(p.id)),
       listedPropertyIds: data.properties
         .filter((p: any) => p.is_listed)
-        .map((p: any) => strip(p.id)),
+        .map((p: any) => strip(p.id.replace(`${SESSION}_`, ""))),
+      unlockTurns: data.properties.reduce((acc: Record<string, number>, p: any) => {
+        acc[p.id.replace(`${SESSION}_`, "")] = p.unlock_turn;
+        return acc;
+      }, {}),
     });
   },
 }));
