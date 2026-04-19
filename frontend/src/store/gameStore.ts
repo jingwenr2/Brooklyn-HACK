@@ -92,6 +92,8 @@ interface GameStore {
   diceModalOpen: boolean;
   diceResult: DiceResult | null;
   loading: boolean;
+  gameOver: boolean;
+  victoryState: "WIN" | "LOSS" | "BANKRUPT" | null;
 
   // Actions
   initGame: () => Promise<void>;
@@ -104,6 +106,7 @@ interface GameStore {
   researchProperty: () => Promise<void>;
   answerTrivia: (index: number) => Promise<void>;
   endTurn: () => Promise<void>;
+  playAgain: () => Promise<void>;
   refreshStatus: () => Promise<void>;
   // UI state
   triviaOpen: boolean;
@@ -140,6 +143,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   diceModalOpen: false,
   diceResult: null,
   loading: false,
+  gameOver: false,
+  victoryState: null,
   triviaOpen: false,
   triviaQuestion: null,
   pauseOpen: false,
@@ -182,6 +187,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       loading: false,
     });
     await get().refreshStatus();
+    set({ gameOver: false, victoryState: null });
+  },
+
+  playAgain: async () => {
+    set({ loading: true, gameOver: false, victoryState: null });
+    await get().initGame();
   },
 
   resumeGame: async () => {
@@ -246,7 +257,6 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     });
 
     if (res.ok) {
-      set({ selectedPropertyId: null });
       await get().refreshStatus();
       get().addToast(`Property acquired: ${selectedPropertyId.replace(/_/g, " ")}`, "success");
     } else {
@@ -343,6 +353,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const res = await fetch(`${API}/${SESSION}/turn/end`, { method: "POST" });
     const data = await res.json();
 
+    await get().refreshStatus();
+    const isBankrupt = get().isBankrupt;
+    const victoryState = data.game_over
+      ? isBankrupt
+        ? "BANKRUPT"
+        : data.victory
+        ? "WIN"
+        : "LOSS"
+      : null;
     if (data.game_over) {
       set({
         gameOverData: {
@@ -371,12 +390,13 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
     set({
       ap: null,
-      diceModalOpen: true,
+      diceModalOpen: data.game_over ? false : true,
       diceResult: null,
       selectedPropertyId: null,
       loading: false,
+      gameOver: data.game_over,
+      victoryState,
     });
-    await get().refreshStatus();
   },
 
   refreshStatus: async () => {

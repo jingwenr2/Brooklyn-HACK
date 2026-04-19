@@ -57,30 +57,6 @@ export default function Portfolio() {
         <span>Rent/turn</span>
         <span style={{ color: "var(--color-neon-green)" }}>+{money(totalRent)}</span>
       </div>
-
-      {ownedProperties.length > 0 && (
-        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-          {ownedProperties.map((p) => {
-            const meta = propertyMeta[p.id];
-            return (
-              <button
-                key={p.id}
-                className="btn"
-                style={{ fontSize: 9, padding: "6px 8px", textAlign: "left" }}
-                onClick={() => selectProperty(p.id)}
-              >
-                {p.name} Lv{meta?.devLevel ?? 0} — {money(meta?.rentValue ?? 0)}/t
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {ownedProperties.length === 0 && (
-        <div className="card__row card__row--muted" style={{ fontSize: 14 }}>
-          No properties owned yet.
-        </div>
-      )}
     </div>
   );
 }

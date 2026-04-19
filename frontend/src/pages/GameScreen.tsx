@@ -5,10 +5,10 @@ import DistrictBoard from "../components/DistrictBoard";
 import PlayerCard from "../components/PlayerCard";
 import RivalCard from "../components/RivalCard";
 import TopBar from "../components/TopBar";
+import VictoryScreen from "../components/VictoryScreen";
 import Announcements from "../components/Announcements";
 import TurnTimer from "../components/TurnTimer";
 import Portfolio from "../components/Portfolio";
-import GameOverScreen from "../components/GameOverScreen";
 import PauseMenu from "../components/PauseMenu";
 import EventToast from "../components/EventToast";
 import BluffBar from "../components/BluffBar";
@@ -28,7 +28,11 @@ export default function GameScreen() {
   const ownedIds = useGameStore((s) => s.ownedPropertyIds);
   const propertyMeta = useGameStore((s) => s.propertyMeta);
   const loading = useGameStore((s) => s.loading);
-  const gameOverData = useGameStore((s) => s.gameOverData);
+  const cash = useGameStore((s) => s.cash);
+  const netWorth = useGameStore((s) => s.netWorth);
+  const gameOver = useGameStore((s) => s.gameOver);
+  const victoryState = useGameStore((s) => s.victoryState);
+  const playAgain = useGameStore((s) => s.playAgain);
   const initGame = useGameStore((s) => s.initGame);
   const resumeGame = useGameStore((s) => s.resumeGame);
   const buyProperty = useGameStore((s) => s.buyProperty);
@@ -48,7 +52,7 @@ export default function GameScreen() {
     }
   }, []);
 
-  const isGameOver = isBankrupt || turn >= maxTurns;
+  const isGameOver = isBankrupt || turn >= maxTurns || gameOver;
   const canAct = ap != null && ap >= 1 && selectedId != null && !loading && !isGameOver;
   const canBuy = canAct && listedIds.includes(selectedId!) && !ownedIds.includes(selectedId!);
   const canDevelop = canAct && ownedIds.includes(selectedId!) && (propertyMeta[selectedId!]?.devLevel ?? 0) < 3;
@@ -57,8 +61,8 @@ export default function GameScreen() {
   const selectedMeta = selectedId ? propertyMeta[selectedId] : null;
   const selectedPriceStr = selectedMeta ? `$${Math.floor(selectedMeta.marketValue / 1000)}k` : "";
 
-  // Dev cost: $1,500 flat + 15% of market value (from config.py)
-  const devCost = selectedMeta ? 1500 + Math.floor(0.15 * selectedMeta.marketValue) : 0;
+  // Dev cost: $500 flat + 15% of market value (from config.py)
+  const devCost = selectedMeta ? 500 + Math.floor(0.15 * selectedMeta.marketValue) : 0;
   const devCostStr = devCost ? `$${(devCost / 1000).toFixed(1)}k` : "";
 
   return (
@@ -127,10 +131,19 @@ export default function GameScreen() {
       <IntelFeed />
 
       <APDiceRoll />
+      {gameOver && victoryState ? (
+        <VictoryScreen
+          variant={victoryState}
+          cash={cash}
+          netWorth={netWorth}
+          propsOwned={ownedIds.length}
+          turn={turn}
+          onPlayAgain={playAgain}
+        />
+      ) : null}
       <TriviaModal />
       <PauseMenu />
       <EventToast />
-      {gameOverData && <GameOverScreen />}
     </div>
   );
 }
