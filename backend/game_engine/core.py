@@ -22,17 +22,79 @@ from backend.game_engine.trivia import generate_trivia
 # ──────────────────────────────────────────────
 #  PROPERTY BLUEPRINTS (10 total, matching sprites)
 # ──────────────────────────────────────────────
+# ──────────────────────────────────────────────
+#  DICE OUTCOMES (1d6 storyline — see config.Balance expected value: +3.5 AP, -$83/turn)
+# ──────────────────────────────────────────────
+#  Face 1: bad break (2 AP, -$1,500)
+#  Face 2: slow start (2 AP, 0)
+#  Face 3–5: normal (3/4/5 AP, 0)
+#  Face 6: lucky break (5 AP, +$1,000)
+DICE_OUTCOMES = [
+    {
+        "ap": 2, "cash": -1_500, "tone": "bad",
+        "flavors": [
+            "Tenant ghosted you this month. Lose $1,500 in skipped rent.",
+            "Pipe burst on the third floor. Emergency plumber charged $1,500.",
+            "Surprise city inspection fine. -$1,500, fight it next quarter.",
+            "Your cousin's 'can't-miss' pitch fell apart. You lose $1,500.",
+            "Broker 'accidentally' double-billed you. -$1,500 until it clears.",
+        ],
+    },
+    {
+        "ap": 2, "cash": 0, "tone": "slow",
+        "flavors": [
+            "Slow week. Phones quiet, deals frozen. Only 2 AP.",
+            "Coffee machine broke. Morale tanked. 2 AP.",
+            "Market's holding its breath. You manage 2 AP today.",
+        ],
+    },
+    {
+        "ap": 3, "cash": 0, "tone": "neutral",
+        "flavors": [
+            "Solid grind. 3 AP on the board.",
+            "Three meetings, three moves. 3 AP.",
+            "Average day at the office. 3 AP.",
+        ],
+    },
+    {
+        "ap": 4, "cash": 0, "tone": "neutral",
+        "flavors": [
+            "You're dialed in today. 4 AP.",
+            "Good coffee, better instincts. 4 AP to spend.",
+            "Momentum building — 4 AP.",
+        ],
+    },
+    {
+        "ap": 5, "cash": 0, "tone": "hot",
+        "flavors": [
+            "Firing on all cylinders. 5 AP.",
+            "Your assistant triple-booked you in the best way. 5 AP.",
+            "Everyone's returning your calls. 5 AP.",
+        ],
+    },
+    {
+        "ap": 5, "cash": 1_000, "tone": "lucky",
+        "flavors": [
+            "Found $1,000 of uncashed rent checks in a drawer. Bonus cash + 5 AP.",
+            "Your tweet about the neighborhood went viral. +$1,000 referral. 5 AP.",
+            "Local paper featured your building. +$1,000 in ad revenue. 5 AP.",
+            "Tenant paid a year up-front on a hunch. +$1,000 float, 5 AP.",
+        ],
+    },
+]
+
+
 BLUEPRINTS = [
-    {"name": "Startup Lofts",  "key": "startup_lofts",  "tier": "budget",  "val": 6_000,  "unlock": 1},
-    {"name": "Trade Center",   "key": "trade_center",   "tier": "budget",  "val": 7_000,  "unlock": 5},
-    {"name": "Signal Tower",   "key": "signal_tower",   "tier": "budget",  "val": 8_000,  "unlock": 1},
-    {"name": "Market Block",   "key": "market_block",   "tier": "budget",  "val": 9_000,  "unlock": 18},
-    {"name": "Venture Place",  "key": "venture_place",  "tier": "mid",     "val": 12_000, "unlock": 1},
-    {"name": "Capital Square", "key": "capital_square",  "tier": "mid",     "val": 14_000, "unlock": 3},
-    {"name": "Exchange Tower", "key": "exchange_tower",  "tier": "mid",     "val": 16_000, "unlock": 7},
-    {"name": "Metro Spire",    "key": "metro_spire",    "tier": "mid",     "val": 18_000, "unlock": 12},
-    {"name": "Mogul Tower",    "key": "mogul_tower",    "tier": "premium", "val": 28_000, "unlock": 9},
-    {"name": "Apex Plaza",     "key": "apex_plaza",     "tier": "premium", "val": 38_000, "unlock": 15},
+    {"name": "Startup Lofts",  "key": "startup_lofts",  "tier": "budget",  "val": 6_000,  "unlock": 1,  "category": "tech"},
+    {"name": "Trade Center",   "key": "trade_center",   "tier": "budget",  "val": 7_000,  "unlock": 5,  "category": "finance"},
+    {"name": "Signal Tower",   "key": "signal_tower",   "tier": "budget",  "val": 8_000,  "unlock": 1,  "category": "tech"},
+    {"name": "Market Block",   "key": "market_block",   "tier": "budget",  "val": 9_000,  "unlock": 18, "category": "finance"},
+    {"name": "Venture Place",  "key": "venture_place",  "tier": "mid",     "val": 12_000, "unlock": 1,  "category": "finance"},
+    {"name": "Capital Square", "key": "capital_square", "tier": "mid",     "val": 14_000, "unlock": 3,  "category": "finance"},
+    {"name": "Exchange Tower", "key": "exchange_tower", "tier": "mid",     "val": 16_000, "unlock": 7,  "category": "finance"},
+    {"name": "Metro Spire",    "key": "metro_spire",    "tier": "mid",     "val": 18_000, "unlock": 12, "category": "urban"},
+    {"name": "Mogul Tower",    "key": "mogul_tower",    "tier": "premium", "val": 28_000, "unlock": 9,  "category": "culture"},
+    {"name": "Apex Plaza",     "key": "apex_plaza",     "tier": "premium", "val": 38_000, "unlock": 15, "category": "urban"},
 ]
 
 
@@ -115,6 +177,7 @@ def create_new_game(db: Session, session_id: str) -> GameState:
             name=bp["name"],
             district="pixel_park",
             tier=bp["tier"],
+            theme_category=bp["category"],
             sprite_key=bp["key"],
             base_value=bp["val"],
             market_value=bp["val"],
@@ -181,8 +244,8 @@ def start_turn(db: Session, game: GameState) -> dict:
     Start-of-turn sequence (architecture.md §2):
       1. Pay mortgage/debt interest
       2. Drip-feed property listings
-      3. Roll AP (1d4+1)
-    Returns dict with ap, low_roll flag, and newly listed property ids.
+      3. Roll 1d6 storyline dice — AP + optional cash delta + flavor text
+    Returns dict with ap, dice_roll, cash_delta, flavor, low_roll, and new listings.
     """
     newly_listed = []
 
@@ -200,20 +263,38 @@ def start_turn(db: Session, game: GameState) -> dict:
         Property.owner_id == None,
         Property.expiry_turn == None,
     ).all()
-    
+
     for prop in props:
         prop.is_listed = True
         prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
         newly_listed.append(prop.id)
 
-    # 3. Roll AP
-    rolled_ap = random.randint(1, BALANCE.AP_DICE_SIDES) + BALANCE.AP_DICE_MODIFIER
+    # 3. Storyline dice: 1d6 → AP, cash swing, flavor text
+    face = random.randint(1, 6)
+    outcome = DICE_OUTCOMES[face - 1]
+    rolled_ap = outcome["ap"]
+    cash_delta = outcome["cash"]
+    flavor = random.choice(outcome["flavors"])
+    tone = outcome["tone"]
+
     game.current_ap = rolled_ap
     is_low_roll = rolled_ap <= BALANCE.LOW_ROLL_THRESHOLD
+
+    # Apply storyline cash delta to the human player only (AI is unaffected).
+    if cash_delta:
+        user = db.query(Player).filter(
+            Player.game_id == game.id, Player.role == "USER"
+        ).first()
+        if user and not user.is_bankrupt:
+            user.cash += cash_delta
 
     db.commit()
     return {
         "ap": rolled_ap,
+        "dice_roll": face,
+        "cash_delta": cash_delta,
+        "flavor": flavor,
+        "tone": tone,
         "low_roll": is_low_roll,
         "newly_listed": newly_listed,
         "turn": game.turn,
@@ -274,10 +355,19 @@ def end_turn(db: Session, game: GameState) -> dict:
     net_worth = _calc_net_worth(db, user) if user else 0
     user_props_count = db.query(Property).filter(Property.owner_id == user.id).count() if user else 0
 
+    # Early "Mogul Victory" — must be ahead of the rival on net worth AND meet
+    # the absolute thresholds. Previously the rival was ignored, so the player
+    # auto-won at turn 10 even while Flipper out-earned them.
+    flipper_player = db.query(Player).filter(
+        Player.game_id == game.id, Player.role == "FLIPPER"
+    ).first()
+    flipper_nw = _calc_net_worth(db, flipper_player) if flipper_player else 0
+
     if (
         game.turn >= BALANCE.EARLY_WIN_TURN
         and net_worth >= BALANCE.EARLY_WIN_NET_WORTH
         and user_props_count >= BALANCE.EARLY_WIN_MIN_PROPERTIES
+        and net_worth > flipper_nw
     ):
         game_over = True
         victory = True
@@ -443,8 +533,12 @@ def research_action(
     if catalyst is None:
         return {"success": False, "error": "No catalysts left to research — game is too late"}
 
-    # Fast path: use a pre-generated question if one exists for this catalyst.
-    pregen_id = f"{game.id}_{catalyst.id}"
+    # Trivia category follows the PROPERTY's theme, not the catalyst's —
+    # players learn about the building type they clicked on.
+    prop_category = prop.theme_category or catalyst.category
+
+    # Fast path: use a pre-generated question for this category if one exists.
+    pregen_id = f"{game.id}_{prop_category}"
     pregen = db.query(PregenTrivia).filter(PregenTrivia.id == pregen_id).first()
     if pregen:
         q_question = pregen.question
@@ -454,7 +548,7 @@ def research_action(
         q_source = pregen.source
         db.delete(pregen)
     else:
-        q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty=difficulty)
+        q = generate_trivia(theme=prop.name, category=prop_category, difficulty=difficulty)
         q_question = q.question
         q_options_json = json.dumps(q.options)
         q_correct_index = q.correct_index
@@ -555,8 +649,9 @@ def answer_trivia(db: Session, game: GameState, player: Player, answer_index: in
 
 def pregen_next_trivia(session_id: str) -> None:
     """
-    Background task: generate a trivia question for the next unrevealed catalyst
-    and cache it in PregenTrivia. Safe to call from FastAPI's BackgroundTasks —
+    Background task: ensure a trivia question is cached for every unique
+    property category in this game, so a click on any property pulls an
+    on-theme question instantly. Safe to call from FastAPI's BackgroundTasks —
     opens its own DB session so it doesn't tangle with the request's session.
     """
     from backend.database import SessionLocal  # local import to avoid cycles at module load
@@ -567,32 +662,28 @@ def pregen_next_trivia(session_id: str) -> None:
         if not game:
             return
 
-        catalyst = db.query(Catalyst).filter(
-            Catalyst.game_id == session_id,
-            Catalyst.status == "pending",
-            Catalyst.revealed == False,
-            Catalyst.scheduled_turn > game.turn,
-        ).order_by(Catalyst.scheduled_turn.asc()).first()
-        if not catalyst:
+        props = db.query(Property).filter(Property.game_id == session_id).all()
+        categories = {p.theme_category for p in props if p.theme_category}
+        if not categories:
             return
 
-        pregen_id = f"{session_id}_{catalyst.id}"
-        if db.query(PregenTrivia).filter(PregenTrivia.id == pregen_id).first():
-            return  # already cached
+        for category in categories:
+            pregen_id = f"{session_id}_{category}"
+            if db.query(PregenTrivia).filter(PregenTrivia.id == pregen_id).first():
+                continue  # already cached for this category
 
-        q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty="medium")
-        db.add(PregenTrivia(
-            id=pregen_id,
-            game_id=session_id,
-            catalyst_id=catalyst.id,
-            question=q.question,
-            options_json=json.dumps(q.options),
-            correct_index=q.correct_index,
-            category=q.category,
-            source=q.source,
-            created_turn=game.turn,
-        ))
-        db.commit()
+            q = generate_trivia(theme=category, category=category, difficulty="medium")
+            db.add(PregenTrivia(
+                id=pregen_id,
+                game_id=session_id,
+                category=category,
+                question=q.question,
+                options_json=json.dumps(q.options),
+                correct_index=q.correct_index,
+                source=q.source,
+                created_turn=game.turn,
+            ))
+            db.commit()
     except Exception:
         db.rollback()
     finally:
@@ -701,12 +792,39 @@ def _apply_rival_action(
         rival.cash += prop.market_value
         prop.owner_id = None
         prop.is_listed = True
+<<<<<<< HEAD
         prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
+=======
+        prop.expiry_turn = game.turn + random.randint(
+            BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS
+        )
+>>>>>>> origin/main
         return {
             "actor": rival.role,
             "action": "sell",
             "property": prop.name,
             "price": prop.market_value,
+            "turn": game.turn,
+        }
+
+    if atype == "develop":
+        if prop.owner_id != rival.id:
+            return None
+        if prop.dev_level >= BALANCE.MAX_DEV_LEVEL:
+            return None
+        cost = _calc_dev_cost(prop.market_value)
+        if rival.cash < cost:
+            return None
+        rival.cash -= cost
+        prop.dev_level += 1
+        prop.rent_value = _calc_rent(prop.base_value, prop.dev_level)
+        prop.market_value = int(prop.base_value * BALANCE.dev_value_multiplier(prop.dev_level))
+        return {
+            "actor": rival.role,
+            "action": "develop",
+            "property": prop.name,
+            "new_level": prop.dev_level,
+            "cost": cost,
             "turn": game.turn,
         }
 

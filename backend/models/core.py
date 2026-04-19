@@ -47,6 +47,7 @@ class Property(Base):
     name = Column(String)                        # e.g., "Startup Lofts"
     district = Column(String)                    # e.g., "pixel_park"
     tier = Column(String)                        # "budget", "mid", "premium"
+    theme_category = Column(String, default="urban")  # tech/finance/urban/culture/gaming — drives research trivia
     sprite_key = Column(String, nullable=True)   # Key into sprite_registry.json
 
     base_value = Column(Integer)                 # Price at game start
@@ -115,17 +116,17 @@ class TriviaSession(Base):
 class PregenTrivia(Base):
     """
     Trivia questions pre-generated in the background so Research returns instantly.
-    Keyed by (game_id, catalyst_id) — one pending pregen per catalyst.
+    Keyed by (game_id, category) — one pregen per unique property category so a
+    click on any property pulls a same-category question instantly.
     """
     __tablename__ = "pregen_trivia"
 
-    id = Column(String, primary_key=True, index=True)  # f"{game_id}_{catalyst_id}"
+    id = Column(String, primary_key=True, index=True)  # f"{game_id}_{category}"
     game_id = Column(String, ForeignKey("game_state.id"))
-    catalyst_id = Column(String, ForeignKey("catalysts.id"))
+    category = Column(String, index=True)
 
     question = Column(String)
     options_json = Column(String)
     correct_index = Column(Integer)
-    category = Column(String)
     source = Column(String)
     created_turn = Column(Integer)
