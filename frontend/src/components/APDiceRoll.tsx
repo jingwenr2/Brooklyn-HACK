@@ -65,9 +65,6 @@ export default function APDiceRoll() {
   return (
     <div className="dice-overlay">
       <div className="dice-modal">
-        <div style={{ position: "absolute", top: 12, right: 16, fontSize: 8, color: "var(--color-copper)", letterSpacing: 1 }}>
-          [ TIMER PAUSED ]
-        </div>
         <h2 className="dice-modal__title">TURN {turn}</h2>
         <p className="dice-modal__sub">Roll for Action Points</p>
         <div className={`dice ${rolling ? "dice--spinning" : ""}`}>

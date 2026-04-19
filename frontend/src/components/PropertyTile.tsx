@@ -57,19 +57,40 @@ export default function PropertyTile({ property, position }: Props) {
         }`}
       onClick={handleClick}
     >
-      <div className="tile__shadow" />
-      <div className="tile__base" />
-      <img src={property.sprite} alt={property.name} className="tile__sprite" />
+      <div className="tile__visuals">
+        <div className="tile__shadow" />
+        <div className="tile__base" />
+        <img src={property.sprite} alt={property.name} className="tile__sprite" />
 
-      {/* Status Badges for non-interactive tiles */}
-      {isLocked && (
-        <span className="tile__badge tile__badge--status">LOCKED</span>
-      )}
-      {isExpired && (
-        <span className="tile__badge tile__badge--status tile__badge--expired">OFF-MARKET</span>
-      )}
+        {/* Status Badges for non-interactive tiles */}
+        {isLocked && (
+          <span className="tile__badge tile__badge--status">LOCKED</span>
+        )}
+        {isExpired && (
+          <span className="tile__badge tile__badge--status tile__badge--expired">OFF-MARKET</span>
+        )}
 
-      {/* Precise Hitboxes */}
+        {isSelected && (
+          <div className="tile__selection-indicator" aria-hidden="true">
+            <div className="tile__selection-pyramid" />
+          </div>
+        )}
+
+        {isExpiringSoon && (
+          <span
+            className="tile__badge tile__badge--danger tile__badge--pulse"
+            aria-label="Expiring soon"
+          >
+            ⏳
+          </span>
+        )}
+
+        <span className="tile__tier">
+          {isOwned ? "YOU" : isRivalOwned ? "FLIPPER" : property.tier}
+        </span>
+      </div>
+
+      {/* Precise Hitboxes (Static - won't move on hover) */}
       <div className="tile__hitbox tile__hitbox--base" />
       <div className="tile__hitbox tile__hitbox--left" />
       <div className="tile__hitbox tile__hitbox--mid-left" />
@@ -87,25 +108,6 @@ export default function PropertyTile({ property, position }: Props) {
       <div className="tile__hitbox tile__hitbox--lower" />
       <div className="tile__hitbox tile__hitbox--mid" />
       <div className="tile__hitbox tile__hitbox--top" />
-
-      {isSelected && (
-        <div className="tile__selection-indicator" aria-hidden="true">
-          <div className="tile__selection-pyramid" />
-        </div>
-      )}
-
-      {isExpiringSoon && (
-        <span
-          className="tile__badge tile__badge--danger tile__badge--pulse"
-          aria-label="Expiring soon"
-        >
-          ⏳
-        </span>
-      )}
-
-      <span className="tile__tier">
-        {isOwned ? "YOU" : isRivalOwned ? "FLIPPER" : property.tier}
-      </span>
     </button>
   );
 }

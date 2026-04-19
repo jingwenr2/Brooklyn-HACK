@@ -221,27 +221,35 @@
   background: transparent;
   border: none;
   padding: 0;
+  pointer-events: none;
+}
+
+.tile__visuals {
+  width: 100%;
+  height: 100%;
+  position: relative;
   animation: tile-bob 2.4s ease-in-out infinite;
   /* Smoother transition for the hover lift */
   transition: 
     transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     filter 0.3s ease;
-  pointer-events: none;
 }
 
-.tile:hover {
+.tile:hover .tile__visuals {
   transform: translateY(-8px); /* Slightly higher lift for better feel */
-  /* Remove animation: none to allow smooth blend */
 }
 
 /* Exit delay to prevent flickering when mouse passes between hitboxes */
-.tile:not(:hover) {
+.tile:not(:hover) .tile__visuals {
   transition-delay: 0.05s;
 }
 
 .tile--locked, .tile--expired {
-  animation: none;
   cursor: default;
+}
+
+.tile--locked .tile__visuals, .tile--expired .tile__visuals {
+  animation: none;
 }
 
 .tile--locked .tile__hitbox, .tile--expired .tile__hitbox {
@@ -250,12 +258,12 @@
 }
 
 /* Ghostly Glass for future properties (light, transparent, desaturated) */
-.tile--locked {
+.tile--locked .tile__visuals {
   filter: grayscale(0.8) brightness(1.1) opacity(0.45);
 }
 
 /* Cold Grayscale for expired properties */
-.tile--expired {
+.tile--expired .tile__visuals {
   filter: grayscale(1) brightness(0.4) opacity(0.5);
 }
 
