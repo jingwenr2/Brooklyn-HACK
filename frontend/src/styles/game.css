@@ -590,6 +590,49 @@
   letter-spacing: 2px;
 }
 
+.dice-modal__cash {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+
+.dice-modal__cash--neg {
+  color: #ff6b6b;
+}
+
+.dice-modal__cash--pos {
+  color: var(--color-neon-green);
+}
+
+.dice-modal__flavor {
+  max-width: 340px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 0 8px;
+}
+
+.dice-modal--bad {
+  border-color: #ff6b6b;
+  box-shadow: 0 0 24px rgba(255, 107, 107, 0.35);
+}
+
+.dice-modal--lucky {
+  border-color: var(--color-neon-green);
+  box-shadow: 0 0 24px rgba(120, 255, 120, 0.35);
+}
+
+.dice-modal--slow {
+  border-color: var(--color-text-muted);
+}
+
+.dice-modal--hot {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 18px rgba(255, 200, 80, 0.25);
+}
+
 .dice {
   width: 96px;
   height: 96px;

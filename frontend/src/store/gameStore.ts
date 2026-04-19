@@ -16,6 +16,14 @@ export interface TriviaQuestion {
   source: "openai" | "fallback";
 }
 
+export interface DiceResult {
+  face: number;       // 1..6
+  ap: number;
+  cashDelta: number;  // negative, zero, or positive
+  flavor: string;     // story text
+  tone: "bad" | "slow" | "neutral" | "hot" | "lucky";
+}
+
 export interface CatalystEvent {
   id: string;
   theme: string;
@@ -82,6 +90,7 @@ interface GameStore {
   boardPositions: GridPos[];
   unlockTurns: Record<string, number>;
   diceModalOpen: boolean;
+  diceResult: DiceResult | null;
   loading: boolean;
 
   // Actions
@@ -129,6 +138,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   boardPositions: BASE_POSITIONS,
   unlockTurns: {},
   diceModalOpen: false,
+  diceResult: null,
   loading: false,
   triviaOpen: false,
   triviaQuestion: null,
@@ -156,6 +166,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       selectedPropertyId: null,
       unlockTurns: {},
       boardPositions: shuffled,
+      diceResult: null,
     });
 
     // Also store game ID so we can support multiple later
@@ -187,7 +198,24 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const res = await fetch(`${API}/${SESSION}/turn/start`, { method: "POST" });
     if (!res.ok) throw new Error("Failed to roll Action Points");
     const data = await res.json();
-    set({ ap: data.ap });
+    const dice: DiceResult = {
+      face: data.dice_roll ?? data.ap,
+      ap: data.ap,
+      cashDelta: data.cash_delta ?? 0,
+      flavor: data.flavor ?? "",
+      tone: (data.tone as DiceResult["tone"]) ?? "neutral",
+    };
+    set({ ap: data.ap, diceResult: dice });
+
+    // Surface the storyline cash swing as a toast so the player feels it in-world.
+    if (dice.cashDelta < 0) {
+      get().addToast(dice.flavor, "danger");
+      get().addIntel(`Turn ${get().turn} — ${dice.flavor}`);
+    } else if (dice.cashDelta > 0) {
+      get().addToast(dice.flavor, "success");
+      get().addIntel(`Turn ${get().turn} — ${dice.flavor}`);
+    }
+
     await get().refreshStatus();
   },
 
@@ -344,6 +372,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     set({
       ap: null,
       diceModalOpen: true,
+      diceResult: null,
       selectedPropertyId: null,
       loading: false,
     });

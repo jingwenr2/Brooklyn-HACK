@@ -59,16 +59,25 @@ def _openai_question(theme: str, category: str, difficulty: str) -> Optional[Tri
         return None
 
     client = OpenAI(api_key=OPENAI_API_KEY)
+    category_hints = {
+        "tech": "software companies, computing history, famous engineers, consumer tech",
+        "finance": "stock markets, banking history, economics, famous investors",
+        "urban": "city planning, architecture, real estate, world cities",
+        "culture": "film, music, art, pop-culture milestones",
+        "gaming": "video games, esports, game studios, console history",
+    }
+    hint = category_hints.get(category, "general knowledge")
     prompt = (
-        f"Generate a {difficulty} multiple-choice trivia question related to: "
-        f"{theme}. Category: {category} (gaming, tech, urban, finance, culture). "
+        f"Generate a {difficulty} multiple-choice trivia question in the "
+        f"category: {category}. Topic areas to draw from: {hint}. "
+        f"Flavor hint (optional inspiration, don't reference directly): {theme}.\n"
         "Return STRICT JSON with this shape and no extra prose:\n"
         '{"question": "...", "options": ["a","b","c","d"], "correct_index": 0}\n'
         "Rules:\n"
         "- Exactly 4 options.\n"
         "- correct_index is the 0-based index of the right answer.\n"
         "- Keep each option under 80 characters.\n"
-        "- Do not reference the catalyst itself; make it a real trivia question."
+        "- Make it a real, verifiable trivia question — not a riddle."
     )
 
     try:
