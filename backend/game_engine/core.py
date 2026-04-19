@@ -701,7 +701,7 @@ def _apply_rival_action(
         rival.cash += prop.market_value
         prop.owner_id = None
         prop.is_listed = True
-        prop.expiry_turn = game.turn + BALANCE.PROPERTY_EXPIRY_TURNS
+        prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
         return {
             "actor": rival.role,
             "action": "sell",
