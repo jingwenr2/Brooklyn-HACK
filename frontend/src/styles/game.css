@@ -620,6 +620,89 @@
   animation: dice-spin 1.4s linear;
 }
 
+/* ============================================================ Trivia modal */
+
+.trivia-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 6, 4, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fade-in 0.2s ease-out;
+}
+
+.trivia-modal {
+  background: var(--color-panel-bg);
+  border: 2px solid var(--color-copper);
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 460px;
+  max-width: 560px;
+}
+
+.trivia-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.trivia-modal__tag { color: var(--color-gold); }
+.trivia-modal__source { color: var(--color-text-muted); }
+
+.trivia-modal__question {
+  font-size: 18px;
+  color: var(--color-text-main);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.trivia-modal__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trivia-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-bg-deep);
+  border: 2px solid var(--color-panel-border);
+  color: var(--color-text-main);
+  padding: 10px 12px;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.trivia-option:hover:not(:disabled) {
+  border-color: var(--color-copper);
+}
+
+.trivia-option--selected {
+  border-color: var(--color-gold);
+  background: rgba(184, 115, 42, 0.15);
+}
+
+.trivia-option__letter {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--color-copper);
+  min-width: 18px;
+}
+
+.trivia-option__text {
+  flex: 1;
+}
+
 /* ============================================================ Intel feed */
 
 .intel {

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.core import GameState, Player, Property
+from backend.models.core import Catalyst, GameState, Player, Property
 import backend.game_engine.core as engine
 
 router = APIRouter(prefix="/game", tags=["Game"])
@@ -15,6 +15,15 @@ router = APIRouter(prefix="/game", tags=["Game"])
 # ── Request bodies ──────────────────────────
 class ActionRequest(BaseModel):
     property_id: str
+
+
+class ResearchRequest(BaseModel):
+    property_id: str
+    difficulty: str = "medium"
+
+
+class TriviaAnswerRequest(BaseModel):
+    answer_index: int
 
 
 # ── Game lifecycle ──────────────────────────
@@ -93,11 +102,22 @@ def action_develop(session_id: str, body: ActionRequest, db: Session = Depends(g
 
 
 @router.post("/{session_id}/action/research")
-def action_research(session_id: str, body: ActionRequest, db: Session = Depends(get_db)):
-    """Research a property for intel (trivia stub for Phase 5)."""
+def action_research(session_id: str, body: ResearchRequest, db: Session = Depends(get_db)):
+    """Start research: generate (or resume) a trivia question for the player."""
     game = _get_game(db, session_id)
     player = _get_user(db, session_id)
-    result = engine.research_action(db, game, player, body.property_id)
+    result = engine.research_action(db, game, player, body.property_id, body.difficulty)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/{session_id}/action/research/answer")
+def action_research_answer(session_id: str, body: TriviaAnswerRequest, db: Session = Depends(get_db)):
+    """Submit a trivia answer — spends 1 AP and reveals (or misleads about) the catalyst."""
+    game = _get_game(db, session_id)
+    player = _get_user(db, session_id)
+    result = engine.answer_trivia(db, game, player, body.answer_index)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -115,6 +135,28 @@ def get_status(session_id: str, db: Session = Depends(get_db)):
     ).first()
 
     props = db.query(Property).filter(Property.game_id == session_id).all()
+
+    catalysts = db.query(Catalyst).filter(Catalyst.game_id == session_id).all()
+    # Only expose revealed events to the player; active/expired are always visible.
+    visible_catalysts = [
+        {
+            "id": c.id,
+            "theme": c.theme,
+            "category": c.category,
+            "direction": c.direction,
+            "copy": c.copy,
+            "scheduled_turn": c.scheduled_turn,
+            "fired_turn": c.fired_turn,
+            "duration": c.duration,
+            "rent_multiplier": c.rent_multiplier,
+            "value_multiplier": c.value_multiplier,
+            "status": c.status,
+            # Hide the scheduled turn for unrevealed pending events.
+            "revealed": c.revealed,
+        }
+        for c in catalysts
+        if c.revealed or c.status in ("active", "expired")
+    ]
 
     return {
         "turn": game.turn,
@@ -152,6 +194,7 @@ def get_status(session_id: str, db: Session = Depends(get_db)):
             }
             for p in props
         ],
+        "catalysts": visible_catalysts,
     }
 
 

@@ -13,6 +13,7 @@ import PauseMenu from "../components/PauseMenu";
 import EventToast from "../components/EventToast";
 import BluffBar from "../components/BluffBar";
 import IntelFeed from "../components/IntelFeed";
+import TriviaModal from "../components/TriviaModal";
 import { useGameStore } from "../store/gameStore";
 
 export default function GameScreen() {
@@ -126,6 +127,7 @@ export default function GameScreen() {
       <IntelFeed />
 
       <APDiceRoll />
+      <TriviaModal />
       <PauseMenu />
       <EventToast />
       {gameOverData && <GameOverScreen />}

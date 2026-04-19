@@ -12,6 +12,23 @@ export interface TriviaQuestion {
   options: string[];
   questionId: string;
   propertyId: string;
+  category: string;
+  source: "openai" | "fallback";
+}
+
+export interface CatalystEvent {
+  id: string;
+  theme: string;
+  category: string;
+  direction: "boom" | "bust";
+  copy: string;
+  scheduledTurn: number;
+  firedTurn: number | null;
+  duration: number;
+  rentMultiplier: number;
+  valueMultiplier: number;
+  status: "pending" | "active" | "expired";
+  revealed: boolean;
 }
 
 export interface GameOverData {
@@ -76,6 +93,7 @@ interface GameStore {
   buyProperty: () => Promise<void>;
   developProperty: () => Promise<void>;
   researchProperty: () => Promise<void>;
+  answerTrivia: (index: number) => Promise<void>;
   endTurn: () => Promise<void>;
   refreshStatus: () => Promise<void>;
   // UI state
@@ -90,6 +108,7 @@ interface GameStore {
   dismissToast: (id: number) => void;
   intelLog: IntelEntry[];
   addIntel: (message: string) => void;
+  catalysts: CatalystEvent[];
 }
 
 export const useGameStore = create<GameStore>()((set, get) => ({
@@ -117,6 +136,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   gameOverData: null,
   toasts: [],
   intelLog: [],
+  catalysts: [],
 
   initGame: async () => {
     // Randomize the property spawns first so the UI instantly lays them out
@@ -237,19 +257,54 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const res = await fetch(`${API}/${SESSION}/action/research`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ property_id: `${SESSION}_${selectedPropertyId}` }),
+      body: JSON.stringify({ property_id: `${SESSION}_${selectedPropertyId}`, difficulty: "medium" }),
     });
 
     if (res.ok) {
       const data = await res.json();
-      const msg = `${data.property} — Value $${data.intel.market_value}, Rent $${data.intel.rent_per_turn}/turn, Dev Lv${data.intel.dev_level}`;
-      get().addToast(`Intel: ${msg}`, "info");
-      get().addIntel(msg);
+      set({
+        triviaQuestion: {
+          question: data.trivia.question,
+          options: data.trivia.options,
+          questionId: data.trivia.question_id,
+          propertyId: data.trivia.property_id,
+          category: data.trivia.category,
+          source: data.trivia.source,
+        },
+        triviaOpen: true,
+      });
     } else {
       const err = await res.json();
       get().addToast(err.detail || "Research failed", "danger");
     }
-    await get().refreshStatus();
+    set({ loading: false });
+  },
+
+  answerTrivia: async (index: number) => {
+    set({ loading: true });
+    const res = await fetch(`${API}/${SESSION}/action/research/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_index: index }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const intel = data.intel || {};
+      if (data.correct) {
+        const msg = `${intel.theme} — ${intel.direction?.toUpperCase()} fires on turn ${intel.fires_on_turn} (rent ×${intel.rent_multiplier}, value ×${intel.value_multiplier})`;
+        get().addToast(`Intel acquired: ${intel.theme}`, "success");
+        get().addIntel(msg);
+      } else {
+        get().addToast(`Wrong answer — ${intel.copy || "bad intel added to feed"}`, "danger");
+        get().addIntel(`Misleading tip: ${intel.theme} may ${intel.direction}`);
+      }
+      set({ triviaOpen: false, triviaQuestion: null });
+      await get().refreshStatus();
+    } else {
+      const err = await res.json();
+      get().addToast(err.detail || "Answer failed", "danger");
+    }
     set({ loading: false });
   },
 
@@ -274,6 +329,14 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
     if (data.rent_collected) {
       get().addToast(`Rent collected: $${data.rent_collected.toLocaleString()}`, "success");
+    }
+
+    if (Array.isArray(data.catalyst_events)) {
+      for (const ev of data.catalyst_events) {
+        const variant = ev.direction === "boom" ? "success" : "danger";
+        get().addToast(`MARKET SHIFT — ${ev.theme}: ${ev.copy}`, variant);
+        get().addIntel(`Turn ${get().turn} — ${ev.theme} (${ev.direction.toUpperCase()})`);
+      }
     }
 
     set({
@@ -335,6 +398,22 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         acc[p.id.replace(`${SESSION}_`, "")] = p.unlock_turn;
         return acc;
       }, {}),
+      catalysts: Array.isArray(data.catalysts)
+        ? data.catalysts.map((c: any): CatalystEvent => ({
+            id: c.id,
+            theme: c.theme,
+            category: c.category,
+            direction: c.direction,
+            copy: c.copy,
+            scheduledTurn: c.scheduled_turn,
+            firedTurn: c.fired_turn,
+            duration: c.duration,
+            rentMultiplier: c.rent_multiplier,
+            valueMultiplier: c.value_multiplier,
+            status: c.status,
+            revealed: Boolean(c.revealed),
+          }))
+        : [],
     });
   },
 

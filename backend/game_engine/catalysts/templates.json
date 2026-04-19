@@ -1,0 +1,46 @@
+{
+  "templates": [
+    {
+      "theme": "Esports championship hype",
+      "category": "gaming",
+      "boom_copy": "Esports finals blow up the district — foot traffic and rent surge.",
+      "bust_copy": "Sponsor scandal tanks the esports scene — tenants flee the district."
+    },
+    {
+      "theme": "New streaming studio opens",
+      "category": "tech",
+      "boom_copy": "A major streamer HQ opens nearby — property values rocket.",
+      "bust_copy": "The streamer lays off their whole studio — leases break."
+    },
+    {
+      "theme": "Subway line extension",
+      "category": "urban",
+      "boom_copy": "New subway line connects the district — values jump.",
+      "bust_copy": "Construction delays paralyze the district — foot traffic collapses."
+    },
+    {
+      "theme": "Retro gaming revival",
+      "category": "gaming",
+      "boom_copy": "Retro arcade chain picks the district — rent climbs.",
+      "bust_copy": "Retro fad fizzles — arcade chain pulls out overnight."
+    },
+    {
+      "theme": "Tech startup bubble",
+      "category": "tech",
+      "boom_copy": "VC money floods into the district — values surge.",
+      "bust_copy": "Startup bubble pops — tech tenants default on rent."
+    },
+    {
+      "theme": "Interest rate cut",
+      "category": "finance",
+      "boom_copy": "Fed slashes rates — mortgage demand spikes, values climb.",
+      "bust_copy": "Fed hikes rates — lending dries up, values drop."
+    },
+    {
+      "theme": "Celebrity opens flagship restaurant",
+      "category": "culture",
+      "boom_copy": "Celebrity restaurant puts the district on the map.",
+      "bust_copy": "Celebrity restaurant fails food inspection — district takes the hit."
+    }
+  ]
+}
