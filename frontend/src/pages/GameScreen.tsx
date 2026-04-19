@@ -5,15 +5,20 @@ import DistrictBoard from "../components/DistrictBoard";
 import PlayerCard from "../components/PlayerCard";
 import RivalCard from "../components/RivalCard";
 import TopBar from "../components/TopBar";
+import Announcements from "../components/Announcements";
 import { useGameStore } from "../store/gameStore";
 
 export default function GameScreen() {
   const [searchParams] = useSearchParams();
   const didInit = useRef(false);
   const ap = useGameStore((s) => s.ap);
+  const turn = useGameStore((s) => s.turn);
+  const maxTurns = useGameStore((s) => s.maxTurns);
+  const isBankrupt = useGameStore((s) => s.isBankrupt);
   const selectedId = useGameStore((s) => s.selectedPropertyId);
   const listedIds = useGameStore((s) => s.listedPropertyIds);
   const ownedIds = useGameStore((s) => s.ownedPropertyIds);
+  const propertyMeta = useGameStore((s) => s.propertyMeta);
   const loading = useGameStore((s) => s.loading);
   const initGame = useGameStore((s) => s.initGame);
   const resumeGame = useGameStore((s) => s.resumeGame);
@@ -33,9 +38,13 @@ export default function GameScreen() {
     }
   }, []);
 
-  const canAct = ap != null && ap >= 1 && selectedId != null && !loading;
+  const isGameOver = isBankrupt || turn >= maxTurns;
+  const canAct = ap != null && ap >= 1 && selectedId != null && !loading && !isGameOver;
   const canBuy = canAct && listedIds.includes(selectedId!) && !ownedIds.includes(selectedId!);
   const canResearch = canAct;
+  
+  const selectedMeta = selectedId ? propertyMeta[selectedId] : null;
+  const selectedPriceStr = selectedMeta ? `$${Math.floor(selectedMeta.marketValue / 1000)}k` : "";
 
   return (
     <div className="game">
@@ -58,14 +67,14 @@ export default function GameScreen() {
         <section className="game__right">
           <RivalCard />
           <div className="action-panel">
-            <h2 className="card__label">== ACTIONS == {ap != null ? `(${ap} AP)` : ""}</h2>
+            <h2 className="card__label">== ACTIONS ==</h2>
 
             {selectedId ? (
-              <div className="card__row" style={{ fontSize: "11px", color: "var(--color-gold)" }}>
+              <div className="card__row" style={{ color: "var(--color-text-main)" }}>
                 Selected: {selectedId.replace(/_/g, " ").toUpperCase()}
               </div>
             ) : (
-              <div className="card__row card__row--muted" style={{ fontSize: "11px" }}>
+              <div className="card__row card__row--muted">
                 Click a property to select it
               </div>
             )}
@@ -75,7 +84,7 @@ export default function GameScreen() {
               disabled={!canBuy}
               onClick={buyProperty}
             >
-              BUY
+              {canBuy && selectedPriceStr ? `BUY — ${selectedPriceStr}` : "BUY"}
             </button>
             <button
               className="btn"
@@ -87,11 +96,12 @@ export default function GameScreen() {
             <button
               className="btn btn--primary"
               onClick={endTurn}
-              disabled={ap == null || loading}
+              disabled={ap == null || loading || isGameOver}
             >
               END TURN
             </button>
           </div>
+          <Announcements />
         </section>
       </div>
 

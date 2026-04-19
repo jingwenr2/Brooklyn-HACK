@@ -25,6 +25,10 @@ interface GameStore {
   cash: number;
   debt: number;
   netWorth: number;
+  isBankrupt: boolean;
+  maxTurns: number;
+  flipperProps: number;
+  flipperCash: number;
   ownedPropertyIds: string[];
   listedPropertyIds: string[];
   propertyMeta: Record<string, PropertyMeta>;
@@ -51,6 +55,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   cash: 22_000,
   debt: 0,
   netWorth: 22_000,
+  isBankrupt: false,
+  maxTurns: 20,
+  flipperProps: 0,
+  flipperCash: 0,
   ownedPropertyIds: [],
   listedPropertyIds: [],
   propertyMeta: {},
@@ -115,8 +123,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   selectProperty: (id) => set({ selectedPropertyId: id }),
 
   buyProperty: async () => {
-    const { selectedPropertyId, ap } = get();
+    const { selectedPropertyId, ap, propertyMeta } = get();
     if (!selectedPropertyId || !ap || ap < 1) return;
+
+    // Frontend safety check
+    const meta = propertyMeta[selectedPropertyId];
+    if (!meta || !meta.listed) {
+      alert("This property is no longer available for purchase.");
+      return;
+    }
 
     set({ loading: true });
     const res = await fetch(`${API}/${SESSION}/action/buy`, {
@@ -208,6 +223,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       cash: data.player.cash,
       debt: data.player.debt,
       netWorth: data.player.net_worth,
+      isBankrupt: data.player.is_bankrupt,
+      maxTurns: data.max_turns,
+      flipperCash: data.flipper.cash,
+      flipperProps: data.properties.filter((p: any) => p.owner_id === flipperId).length,
       // Don't reveal AP while the dice modal is still up — let rollAP set it.
       ap: get().diceModalOpen ? get().ap : data.ap_remaining,
       propertyMeta: meta,
