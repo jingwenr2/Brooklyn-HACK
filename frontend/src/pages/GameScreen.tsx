@@ -37,8 +37,10 @@ export default function GameScreen() {
   const resumeGame = useGameStore((s) => s.resumeGame);
   const buyProperty = useGameStore((s) => s.buyProperty);
   const developProperty = useGameStore((s) => s.developProperty);
+  const sellProperty = useGameStore((s) => s.sellProperty);
   const researchProperty = useGameStore((s) => s.researchProperty);
   const endTurn = useGameStore((s) => s.endTurn);
+  const isRivalThinking = useGameStore((s) => s.isRivalThinking);
 
   // Initialize the game on first mount
   useEffect(() => {
@@ -53,17 +55,35 @@ export default function GameScreen() {
   }, []);
 
   const isGameOver = isBankrupt || turn >= maxTurns || gameOver;
+  const selectedMeta = selectedId ? propertyMeta[selectedId] : null;
+
+  // Tiered Caps: budget=1, mid=2, premium=3
+  const getTierCap = (tier?: string) => {
+    if (tier === "budget") return 1;
+    if (tier === "mid") return 2;
+    if (tier === "premium") return 3;
+    return 0;
+  };
+
+  const currentDevLevel = selectedMeta?.devLevel ?? 0;
+  const tierCap = selectedMeta ? getTierCap(selectedMeta.tier) : 0;
+  const isMaxDeveloped = currentDevLevel >= tierCap;
+
   const canAct = ap != null && ap >= 1 && selectedId != null && !loading && !isGameOver;
   const canBuy = canAct && listedIds.includes(selectedId!) && !ownedIds.includes(selectedId!);
-  const canDevelop = canAct && ownedIds.includes(selectedId!) && (propertyMeta[selectedId!]?.devLevel ?? 0) < 3;
+  const canDevelop = canAct && ownedIds.includes(selectedId!) && !isMaxDeveloped;
+  const canSell = canAct && ownedIds.includes(selectedId!);
   const canResearch = canAct;
   
-  const selectedMeta = selectedId ? propertyMeta[selectedId] : null;
-  const selectedPriceStr = selectedMeta ? `$${Math.floor(selectedMeta.marketValue / 1000)}k` : "";
+  const selectedPriceStr = selectedMeta ? `$${Math.floor((selectedMeta.marketValue || 0) / 1000)}k` : "";
 
-  // Dev cost: $500 flat + 15% of market value (from config.py)
-  const devCost = selectedMeta ? 500 + Math.floor(0.15 * selectedMeta.marketValue) : 0;
+  // Dev cost: $500 flat + 25% of market value (updated for hardcore balance)
+  const devCost = selectedMeta ? 500 + Math.floor(0.25 * (selectedMeta.marketValue || 0)) : 0;
   const devCostStr = devCost ? `$${(devCost / 1000).toFixed(1)}k` : "";
+
+  // Sell payout: 90% of market value
+  const sellPayout = selectedMeta ? Math.floor(0.9 * (selectedMeta.marketValue || 0)) : 0;
+  const sellPayoutStr = sellPayout ? `$${(sellPayout / 1000).toFixed(1)}k` : "";
 
   return (
     <div className="game">
@@ -107,7 +127,14 @@ export default function GameScreen() {
               disabled={!canDevelop}
               onClick={developProperty}
             >
-              {canDevelop && devCostStr ? `DEVELOP — ${devCostStr}` : "DEVELOP"}
+              {isMaxDeveloped ? `MAX REACHED (${selectedMeta?.tier.toUpperCase()})` : canDevelop && devCostStr ? `DEVELOP — ${devCostStr}` : "DEVELOP"}
+            </button>
+            <button
+              className="btn"
+              disabled={!canSell}
+              onClick={sellProperty}
+            >
+              {canSell && sellPayoutStr ? `SELL — ${sellPayoutStr}` : "SELL"}
             </button>
             <button
               className="btn"
@@ -117,7 +144,7 @@ export default function GameScreen() {
               RESEARCH
             </button>
             <button
-              className="btn btn--primary"
+              className={`btn btn--primary ${ap === 0 && !loading ? "btn--pulse-attention" : ""}`}
               onClick={endTurn}
               disabled={ap == null || loading || isGameOver}
             >
@@ -131,6 +158,15 @@ export default function GameScreen() {
       <IntelFeed />
 
       <APDiceRoll />
+
+      {isRivalThinking && (
+        <div className="rival-turn-overlay">
+          <div className="rival-turn-banner">
+            <h2 className="rival-turn-banner__title">RIVAL IS ACTING...</h2>
+          </div>
+        </div>
+      )}
+
       {gameOver && victoryState ? (
         <VictoryScreen
           variant={victoryState}

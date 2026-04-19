@@ -86,6 +86,7 @@ class Catalyst(Base):
 
     rent_multiplier = Column(Float, default=1.0)   # Applied to every property's rent
     value_multiplier = Column(Float, default=1.0)  # Applied to every property's value
+    one_time_fine = Column(Integer, default=0)    # Instant cash penalty on fire
 
     status = Column(String, default="pending")   # pending / active / expired
     revealed = Column(Boolean, default=False)    # Player researched it

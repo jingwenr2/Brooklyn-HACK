@@ -41,10 +41,12 @@ export default function APDiceRoll() {
 
       const result = useGameStore.getState().diceResult;
       setRolling(false);
-      setDisplayFace(result?.face ?? null);
-      // Lucky/bad rolls hold longer so the player can read the flavor line.
-      const hold = result && (result.tone === "bad" || result.tone === "lucky") ? 5 : 3;
-      setAutoProceedTime(hold);
+      // Display the actual AP on the dice face to avoid confusion
+      setDisplayFace(result?.ap ?? null);
+      
+      // If a cash event happened (Bad/Lucky), give 10s to read. Otherwise 8s.
+      const holdTime = result && result.cashDelta !== 0 ? 10 : 8;
+      setAutoProceedTime(holdTime);
     } catch (err) {
       console.error("Dice roll failed:", err);
       setRolling(false);
@@ -54,6 +56,15 @@ export default function APDiceRoll() {
 
   const proceed = async () => {
     if (diceResult == null) return;
+
+    // Financial Alert: Surfacing the "hidden" interest cost
+    if (diceResult.interestPaid > 0) {
+      useGameStore.getState().addToast(
+        `Financial Alert: -$${diceResult.interestPaid.toLocaleString()} paid in debt interest.`, 
+        "danger"
+      );
+    }
+
     setDisplayFace(null);
     setAutoProceedTime(null);
 
@@ -62,24 +73,12 @@ export default function APDiceRoll() {
     useGameStore.setState({ diceModalOpen: false });
   };
 
-  const toneClass = diceResult ? `dice-modal--${diceResult.tone}` : "";
   const showResult = !rolling && diceResult && displayFace != null;
+  const toneClass = showResult ? `dice-modal--${diceResult!.tone}` : "";
 
   return (
     <div className="dice-overlay">
       <div className={`dice-modal ${toneClass}`}>
-        <div
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 16,
-            fontSize: 8,
-            color: "var(--color-copper)",
-            letterSpacing: 1,
-          }}
-        >
-          [ TIMER PAUSED ]
-        </div>
         <h2 className="dice-modal__title">TURN {turn}</h2>
         <p className="dice-modal__sub">Roll for Action Points</p>
         <div className={`dice ${rolling ? "dice--spinning" : ""}`}>
@@ -91,7 +90,9 @@ export default function APDiceRoll() {
           </button>
         ) : (
           <>
-            <div className="dice-modal__result">+{diceResult!.ap} ACTION POINTS</div>
+            <div className="dice-modal__result">
+              +{diceResult!.ap} ACTION POINT{diceResult!.ap === 1 ? "" : "S"}
+            </div>
             {diceResult!.cashDelta !== 0 && (
               <div
                 className={`dice-modal__cash ${

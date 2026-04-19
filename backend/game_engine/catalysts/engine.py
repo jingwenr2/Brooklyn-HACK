@@ -14,7 +14,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.config import BALANCE
-from backend.models.core import Catalyst, GameState, Property
+from backend.models.core import Catalyst, GameState, Player, Property
 
 _TEMPLATES_PATH = Path(__file__).parent / "templates.json"
 _TEMPLATES: list[dict] = []
@@ -48,10 +48,26 @@ def generate_catalysts_for_game(db: Session, game: GameState, count: int = 4) ->
     events = []
     for tpl, turn in zip(chosen, turns):
         is_boom = random.random() < 0.55  # slight boom bias
-        # Rent effect: boom 1.25-1.50, bust 0.70-0.90
-        rent_mult = random.uniform(1.25, 1.50) if is_boom else random.uniform(0.70, 0.90)
-        # Value effect: boom 1.15-1.30, bust 0.75-0.90
-        value_mult = random.uniform(1.15, 1.30) if is_boom else random.uniform(0.75, 0.90)
+        
+        one_time_fine = 0
+        if is_boom:
+            # Rent effect: boom 1.25-1.50
+            rent_mult = random.uniform(1.25, 1.50)
+            # Value effect: boom 1.15-1.30
+            value_mult = random.uniform(1.15, 1.30)
+        else:
+            # 25% chance of being "Toxic" (negative rent)
+            is_toxic = random.random() < 0.25
+            if is_toxic:
+                rent_mult = random.uniform(-0.5, -0.2)
+                value_mult = random.uniform(0.60, 0.80)
+            else:
+                rent_mult = random.uniform(0.70, 0.90)
+                value_mult = random.uniform(0.75, 0.90)
+            
+            # 40% chance of a one-time fine for BUSTs
+            if random.random() < 0.40:
+                one_time_fine = random.randint(1500, 4000)
 
         cat = Catalyst(
             id=f"{game.id}_cat_{turn}_{random.randint(1000, 9999)}",
@@ -63,6 +79,7 @@ def generate_catalysts_for_game(db: Session, game: GameState, count: int = 4) ->
             scheduled_turn=turn,
             rent_multiplier=round(rent_mult, 3),
             value_multiplier=round(value_mult, 3),
+            one_time_fine=one_time_fine,
             duration=random.randint(2, 4),
             status="pending",
             revealed=False,
@@ -84,6 +101,7 @@ def fire_catalysts_for_turn(db: Session, game: GameState) -> list[dict]:
     Expire any active catalyst whose effect window has passed.
     Returns list of event summaries for the UI.
     """
+    from backend.game_engine.core import _normalize_finances # avoid cycle
     fired: list[dict] = []
 
     # 1. Fire newly-due events
@@ -94,19 +112,34 @@ def fire_catalysts_for_turn(db: Session, game: GameState) -> list[dict]:
     ).all()
 
     for cat in due:
-        props = db.query(Property).filter(Property.game_id == game.id).all()
+        # Target only properties in the same category
+        props = db.query(Property).filter(
+            Property.game_id == game.id,
+            Property.theme_category == cat.category
+        ).all()
+        
         for p in props:
             p.market_value = int(p.market_value * cat.value_multiplier)
             p.rent_value = int(p.rent_value * cat.rent_multiplier)
+            
+            # Apply one-time fine if exists
+            if cat.one_time_fine > 0 and p.owner_id:
+                owner = db.query(Player).filter(Player.id == p.owner_id).first()
+                if owner:
+                    owner.cash -= cat.one_time_fine
+                    _normalize_finances(owner)
+
         cat.status = "active"
         cat.fired_turn = game.turn
         fired.append({
             "id": cat.id,
             "theme": cat.theme,
+            "category": cat.category,
             "direction": cat.direction,
             "copy": cat.copy,
             "rent_multiplier": cat.rent_multiplier,
             "value_multiplier": cat.value_multiplier,
+            "one_time_fine": cat.one_time_fine,
             "duration": cat.duration,
         })
 
@@ -117,10 +150,15 @@ def fire_catalysts_for_turn(db: Session, game: GameState) -> list[dict]:
     ).all()
     for cat in expiring:
         if cat.fired_turn is not None and game.turn - cat.fired_turn >= cat.duration:
+            # Target only properties in the same category
+            props = db.query(Property).filter(
+                Property.game_id == game.id,
+                Property.theme_category == cat.category
+            ).all()
+            
             # Revert the multipliers
             inv_value = 1.0 / cat.value_multiplier
             inv_rent = 1.0 / cat.rent_multiplier
-            props = db.query(Property).filter(Property.game_id == game.id).all()
             for p in props:
                 p.market_value = int(p.market_value * inv_value)
                 p.rent_value = int(p.rent_value * inv_rent)
@@ -157,8 +195,23 @@ def pick_catalyst_for_research(db: Session, game: GameState) -> Optional[Catalys
     templates = _load_templates()
     tpl = random.choice(templates)
     is_boom = random.random() < 0.55
-    rent_mult = random.uniform(1.25, 1.50) if is_boom else random.uniform(0.70, 0.90)
-    value_mult = random.uniform(1.15, 1.30) if is_boom else random.uniform(0.75, 0.90)
+    
+    one_time_fine = 0
+    if is_boom:
+        rent_mult = random.uniform(1.25, 1.50)
+        value_mult = random.uniform(1.15, 1.30)
+    else:
+        is_toxic = random.random() < 0.25
+        if is_toxic:
+            rent_mult = random.uniform(-0.5, -0.2)
+            value_mult = random.uniform(0.60, 0.80)
+        else:
+            rent_mult = random.uniform(0.70, 0.90)
+            value_mult = random.uniform(0.75, 0.90)
+        
+        if random.random() < 0.40:
+            one_time_fine = random.randint(1500, 4000)
+
     turn = random.randint(game.turn + 1, max(game.turn + 2, game.max_turns - 1))
 
     cat = Catalyst(
@@ -171,6 +224,7 @@ def pick_catalyst_for_research(db: Session, game: GameState) -> Optional[Catalys
         scheduled_turn=turn,
         rent_multiplier=round(rent_mult, 3),
         value_multiplier=round(value_mult, 3),
+        one_time_fine=one_time_fine,
         duration=random.randint(2, 4),
         status="pending",
         revealed=False,

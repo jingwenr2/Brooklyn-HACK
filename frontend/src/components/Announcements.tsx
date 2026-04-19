@@ -1,4 +1,5 @@
 import { useGameStore } from "../store/gameStore";
+import { PROPERTIES } from "../data/properties";
 
 interface Line {
   message: string;
@@ -13,16 +14,24 @@ export default function Announcements() {
 
   const lines: Line[] = [];
 
+  const getBuildingsInSector = (category: string) => {
+    return Object.entries(propertyMeta)
+      .filter(([_, meta]) => meta.themeCategory === category)
+      .map(([id, _]) => PROPERTIES.find((p) => p.id === id)?.name)
+      .filter(Boolean)
+      .join(", ");
+  };
+
   // Revealed-but-not-yet-fired catalysts (from Research)
   catalysts
     .filter((c) => c.revealed && c.status === "pending")
     .forEach((c) => {
       const turnsAway = c.scheduledTurn - turn;
       if (turnsAway <= 0) return;
-      const arrow = c.direction === "boom" ? "↑" : "↓";
+      const buildings = getBuildingsInSector(c.category);
       lines.push({
-        message: `INTEL: ${c.theme} ${arrow} fires in ${turnsAway} turn${turnsAway === 1 ? "" : "s"}`,
-        color: c.direction === "boom" ? "var(--color-neon-green)" : "var(--color-danger)",
+        message: `INTEL: ${c.category.toUpperCase()} (${buildings}) — ${c.direction.toUpperCase()} in ${turnsAway}t`,
+        color: "var(--color-gold)",
       });
     });
 
@@ -30,10 +39,11 @@ export default function Announcements() {
   catalysts
     .filter((c) => c.status === "active")
     .forEach((c) => {
-      const arrow = c.direction === "boom" ? "↑" : "↓";
+      const buildings = getBuildingsInSector(c.category);
+      const isBoom = c.direction === "boom";
       lines.push({
-        message: `MARKET ${arrow}: ${c.theme} (rent ×${c.rentMultiplier.toFixed(2)}, val ×${c.valueMultiplier.toFixed(2)})`,
-        color: c.direction === "boom" ? "var(--color-neon-green)" : "var(--color-danger)",
+        message: `${c.category.toUpperCase()} SECTOR (${buildings}): ${isBoom ? "RENT SURGE! ↑" : "RENT CRASH! ↓"}`,
+        color: isBoom ? "var(--color-neon-green)" : "var(--color-danger)",
       });
     });
 

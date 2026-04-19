@@ -1,7 +1,6 @@
 import type { GridPos, Property } from "../types/game";
 import { useGameStore } from "../store/gameStore";
-import starFilled from "../../../sprites/star_filled.svg";
-import starEmpty from "../../../sprites/star_empty.svg";
+import devBadge from "../../../sprites/dev_badge.svg";
 
 const TILE_W = 128;
 const ROW_STAGGER_X = 64;
@@ -17,6 +16,8 @@ export default function PropertyTile({ property, position }: Props) {
   const selectProperty = useGameStore((s) => s.selectProperty);
   const meta = useGameStore((s) => s.propertyMeta[property.id]);
   const turn = useGameStore((s) => s.turn);
+  const processingTileId = useGameStore((s) => s.processingTileId);
+  const catalysts = useGameStore((s) => s.catalysts);
 
   const isSelected = selectedId === property.id;
   const ownerRole = meta?.ownerRole ?? null;
@@ -24,6 +25,11 @@ export default function PropertyTile({ property, position }: Props) {
   const isRivalOwned = ownerRole === "FLIPPER";
   const isListed = meta?.listed ?? false;
   const devLevel = meta?.devLevel ?? 0;
+  const isFlipperActing = processingTileId === property.id;
+
+  // Check for active sector-specific catalysts
+  const activeCatalyst = catalysts.find(c => c.status === "active" && c.category === meta?.themeCategory);
+  const isSectorAlert = Boolean(activeCatalyst);
 
   const turnsUntilExpiry = isListed && meta?.expiryTurn != null ? meta.expiryTurn - turn : null;
   const isExpiringSoon = turnsUntilExpiry === 0;
@@ -51,6 +57,8 @@ export default function PropertyTile({ property, position }: Props) {
   if (isOwned) tileClass += " tile--owned-you";
   if (isRivalOwned) tileClass += " tile--owned-rival";
   if ((isOwned || isRivalOwned) && devLevel > 0) tileClass += " tile--has-level";
+  if (isFlipperActing) tileClass += " tile--flipper-acting";
+  if (isSectorAlert) tileClass += ` tile--sector-alert tile--sector-${activeCatalyst?.direction}`;
 
   return (
     <button
@@ -96,9 +104,12 @@ export default function PropertyTile({ property, position }: Props) {
           </span>
         )}
 
-        <span className="tile__tier">
-          {isOwned ? "YOU" : isRivalOwned ? "FLIPPER" : property.tier}
-        </span>
+        <div className="tile__metadata">
+          <span className="tile__tier-label">{property.tier.toUpperCase()}</span>
+          {isOwned || isRivalOwned ? (
+            <span className="tile__owner-tag">{isOwned ? " (YOU)" : " (FLIPPER)"}</span>
+          ) : null}
+        </div>
       </div>
 
       {/* Precise Hitboxes (Static - won't move on hover) */}

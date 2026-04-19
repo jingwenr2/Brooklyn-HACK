@@ -57,6 +57,13 @@ export default function Portfolio() {
         <span>Rent/turn</span>
         <span style={{ color: "var(--color-neon-green)" }}>+{money(totalRent)}</span>
       </div>
+
+      {debt > 0 && (
+        <div className="card__row" style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "var(--color-danger)" }}>Est. Interest</span>
+          <span style={{ color: "var(--color-danger)" }}>-{money(Math.floor(debt * 0.05))}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ export interface DiceResult {
   face: number;       // 1..6
   ap: number;
   cashDelta: number;  // negative, zero, or positive
+  interestPaid: number;
   flavor: string;     // story text
   tone: "bad" | "slow" | "neutral" | "hot" | "lucky";
 }
@@ -63,6 +64,8 @@ export type OwnerRole = "YOU" | "FLIPPER" | null;
 
 export interface PropertyMeta {
   listed: boolean;
+  tier: string;
+  themeCategory: string;
   unlockTurn: number;
   expiryTurn: number | null;
   ownerRole: OwnerRole;
@@ -77,6 +80,8 @@ interface GameStore {
   ap: number | null;
   cash: number;
   debt: number;
+  lastCashDelta: number | null;
+  cashDeltaKey: number;
   netWorth: number;
   isBankrupt: boolean;
   maxTurns: number;
@@ -94,6 +99,8 @@ interface GameStore {
   loading: boolean;
   gameOver: boolean;
   victoryState: "WIN" | "LOSS" | "BANKRUPT" | null;
+  isRivalThinking: boolean;
+  processingTileId: string | null;
 
   // Actions
   initGame: () => Promise<void>;
@@ -103,11 +110,13 @@ interface GameStore {
   activateTimer: () => Promise<void>;
   buyProperty: () => Promise<void>;
   developProperty: () => Promise<void>;
+  sellProperty: () => Promise<void>;
   researchProperty: () => Promise<void>;
   answerTrivia: (index: number) => Promise<void>;
   endTurn: () => Promise<void>;
   playAgain: () => Promise<void>;
   refreshStatus: () => Promise<void>;
+  setLastCashDelta: (delta: number | null) => void;
   // UI state
   triviaOpen: boolean;
   triviaQuestion: TriviaQuestion | null;
@@ -126,9 +135,11 @@ interface GameStore {
 export const useGameStore = create<GameStore>()((set, get) => ({
   turn: 1,
   ap: null,
-  cash: 22_000,
+  cash: 20_000,
   debt: 0,
-  netWorth: 22_000,
+  lastCashDelta: null,
+  cashDeltaKey: 0,
+  netWorth: 20_000,
   isBankrupt: false,
   maxTurns: 20,
   turnExpiresAt: null,
@@ -145,6 +156,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   loading: false,
   gameOver: false,
   victoryState: null,
+  isRivalThinking: false,
+  processingTileId: null,
   triviaOpen: false,
   triviaQuestion: null,
   pauseOpen: false,
@@ -152,6 +165,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   toasts: [],
   intelLog: [],
   catalysts: [],
+
+  setLastCashDelta: (delta) => set({ lastCashDelta: delta }),
 
   initGame: async () => {
     // Randomize the property spawns first so the UI instantly lays them out
@@ -163,9 +178,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       loading: true,
       turn: 1,
       ap: null,
-      cash: 22_000,
+      cash: 20_000,
       debt: 0,
-      netWorth: 22_000,
+      lastCashDelta: null,
+      netWorth: 20_000,
       ownedPropertyIds: [],
       listedPropertyIds: [],
       selectedPropertyId: null,
@@ -213,6 +229,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       face: data.dice_roll ?? data.ap,
       ap: data.ap,
       cashDelta: data.cash_delta ?? 0,
+      interestPaid: data.interest_paid ?? 0,
       flavor: data.flavor ?? "",
       tone: (data.tone as DiceResult["tone"]) ?? "neutral",
     };
@@ -287,6 +304,28 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     set({ loading: false });
   },
 
+  sellProperty: async () => {
+    const { selectedPropertyId, ap } = get();
+    if (!selectedPropertyId || !ap || ap < 1) return;
+
+    set({ loading: true });
+    const res = await fetch(`${API}/${SESSION}/action/sell`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ property_id: `${SESSION}_${selectedPropertyId}` }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      get().addToast(`Property sold for $${data.payout.toLocaleString()}`, "success");
+    } else {
+      const err = await res.json();
+      get().addToast(err.detail || "Cannot sell this property", "danger");
+    }
+    await get().refreshStatus();
+    set({ loading: false });
+  },
+
   researchProperty: async () => {
     const { selectedPropertyId, ap } = get();
     if (!selectedPropertyId || !ap || ap < 1) return;
@@ -333,11 +372,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       const intel = data.intel || {};
       if (data.correct) {
         const msg = `${intel.theme} — ${intel.direction?.toUpperCase()} fires on turn ${intel.fires_on_turn} (rent ×${intel.rent_multiplier}, value ×${intel.value_multiplier})`;
-        get().addToast(`Intel acquired: ${intel.theme}`, "success");
+        get().addToast(`Intel acquired! You received a $1,500 research grant.`, "success");
         get().addIntel(msg);
       } else {
-        get().addToast(`Wrong answer — ${intel.copy || "bad intel added to feed"}`, "danger");
-        get().addIntel(`Misleading tip: ${intel.theme} may ${intel.direction}`);
+        get().addToast(`Research failed — you received a $200 consolation prize for your notes.`, "warning");
+        get().addIntel(`Something is brewing related to ${intel.theme}... (Partial Intel)`);
       }
       set({ triviaOpen: false, triviaQuestion: null });
       await get().refreshStatus();
@@ -349,11 +388,31 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   },
 
   endTurn: async () => {
-    set({ loading: true });
+    set({ loading: true, isRivalThinking: true });
     const res = await fetch(`${API}/${SESSION}/turn/end`, { method: "POST" });
     const data = await res.json();
 
+    // Small delay so the player sees the "Rival is acting" banner first
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    // Process AI events sequentially for drama
+    if (Array.isArray(data.ai_events) && data.ai_events.length > 0) {
+      for (const ev of data.ai_events) {
+        const propId = ev.property.toLowerCase().replace(/ /g, "_");
+        set({ processingTileId: propId });
+        
+        const actionMsg = `${ev.actor} ${ev.action === "buy" ? "bought" : "developed"} ${ev.property}`;
+        get().addToast(actionMsg, "warning");
+        
+        // Wait for the shake animation to play out
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+      }
+    }
+    set({ processingTileId: null });
+
+    // ONLY NOW do we refresh the status to flip the board colors/owners
     await get().refreshStatus();
+
     const isBankrupt = get().isBankrupt;
     const victoryState = data.game_over
       ? isBankrupt
@@ -372,6 +431,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
           turnsPlayed: get().turn,
         },
         loading: false,
+        isRivalThinking: false,
       });
       return;
     }
@@ -394,6 +454,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       diceResult: null,
       selectedPropertyId: null,
       loading: false,
+      isRivalThinking: false,
       gameOver: data.game_over,
       victoryState,
     });
@@ -416,6 +477,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       else if (p.owner_id === flipperId) ownerRole = "FLIPPER";
       meta[short] = {
         listed: p.is_listed,
+        tier: p.tier,
+        themeCategory: p.theme_category,
         unlockTurn: p.unlock_turn,
         expiryTurn: p.expiry_turn,
         ownerRole,
@@ -424,6 +487,17 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         rentValue: p.rent_value,
         devLevel: p.dev_level,
       };
+    }
+
+    const oldCash = get().cash;
+    const newCash = data.player.cash;
+    if (newCash !== oldCash) {
+      set((s) => ({ 
+        lastCashDelta: newCash - oldCash,
+        cashDeltaKey: s.cashDeltaKey + 1 
+      }));
+      // Reset delta after 3 seconds
+      setTimeout(() => set({ lastCashDelta: null }), 3000);
     }
 
     set({
@@ -479,7 +553,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   addToast: (message, variant = "info") => {
     const id = ++toastId;
     set((s) => ({ toasts: [...s.toasts, { id, message, variant }] }));
-    setTimeout(() => get().dismissToast(id), 4000);
+    setTimeout(() => get().dismissToast(id), 7000);
   },
 
   dismissToast: (id) =>

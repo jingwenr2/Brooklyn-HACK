@@ -12,20 +12,20 @@ load_dotenv()
 @dataclass(frozen=True)
 class Balance:
     # --- STARTING ---
-    STARTING_CASH: int = 22_000
+    STARTING_CASH: int = 20_000
     MAX_TURNS: int = 20
     TURN_TIME_LIMIT: int = 40
     EARLY_WIN_TURN: int = 10
-    EARLY_WIN_NET_WORTH: int = 100_000
+    EARLY_WIN_NET_WORTH: int = 60_000
     EARLY_WIN_MIN_PROPERTIES: int = 3
 
     # --- ACTION POINTS (dice roll each turn) ---
-    AP_DICE_SIDES: int = 4
-    AP_DICE_MODIFIER: int = 1
-    AP_MIN: int = 2
-    AP_MAX: int = 5
-    LOW_ROLL_THRESHOLD: int = 2
-    LOW_ROLL_PENALTY_CASH: int = 4_000
+    AP_DICE_SIDES: int = 6
+    AP_DICE_MODIFIER: int = 0
+    AP_MIN: int = 1
+    AP_MAX: int = 3
+    LOW_ROLL_THRESHOLD: int = 1
+    LOW_ROLL_PENALTY_CASH: int = 1_000
 
     # --- TENSION MECHANICS ---
     PROPERTY_EXPIRY_MIN_TURNS: int = 3
@@ -35,7 +35,7 @@ class Balance:
     CASH_DANGER_THRESHOLD: float = 1.0
 
     # --- RENT ---
-    BASE_RENT_YIELD: float = 0.12  # 12% of property value per turn
+    BASE_RENT_YIELD: float = 0.10  # 10% of property value per turn
 
     # Rent multipliers by development level
     RENT_MULTIPLIER_0: float = 1.0   # Undeveloped
@@ -46,7 +46,17 @@ class Balance:
     # --- DEVELOPMENT ---
     MAX_DEV_LEVEL: int = 3
     DEV_FLAT_FEE: int = 500          # Fixed fee per upgrade
-    DEV_PERCENT_FEE: float = 0.15    # + 15% of current property value
+    DEV_PERCENT_FEE: float = 0.25    # + 25% of current property value
+
+    # Tiered development caps: budget=1, mid=2, premium=3
+    TIER_DEV_CAPS: dict[str, int] = field(default_factory=lambda: {
+        "budget": 1,
+        "mid": 2,
+        "premium": 3
+    })
+
+    # --- RESEARCH ---
+    RESEARCH_REWARD_CASH: int = 1_500  # Grant for correct trivia answer
 
     # Market value multiplier per dev level (for net worth calc)
     DEV_VALUE_MULT_0: float = 1.0

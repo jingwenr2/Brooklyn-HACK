@@ -105,6 +105,17 @@ def action_develop(session_id: str, body: ActionRequest, db: Session = Depends(g
     return result
 
 
+@router.post("/{session_id}/action/sell")
+def action_sell(session_id: str, body: ActionRequest, db: Session = Depends(get_db)):
+    """Sell an owned property back to the market."""
+    game = _get_game(db, session_id)
+    player = _get_user(db, session_id)
+    result = engine.sell_property(db, game, player, body.property_id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
 @router.post("/{session_id}/action/research")
 def action_research(session_id: str, body: ResearchRequest, db: Session = Depends(get_db)):
     """Start research: generate (or resume) a trivia question for the player."""
@@ -191,6 +202,7 @@ def get_status(session_id: str, db: Session = Depends(get_db)):
                 "id": p.id,
                 "name": p.name,
                 "tier": p.tier,
+                "theme_category": p.theme_category,
                 "base_value": p.base_value,
                 "market_value": p.market_value,
                 "rent_value": p.rent_value,

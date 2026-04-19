@@ -25,60 +25,59 @@ from backend.game_engine.trivia import generate_trivia
 # ──────────────────────────────────────────────
 #  DICE OUTCOMES (1d6 storyline — see config.Balance expected value: +3.5 AP, -$83/turn)
 # ──────────────────────────────────────────────
-#  Face 1: bad break (2 AP, -$1,500)
-#  Face 2: slow start (2 AP, 0)
-#  Face 3–5: normal (3/4/5 AP, 0)
-#  Face 6: lucky break (5 AP, +$1,000)
+#  Face 1: bad break (1 AP, -10% Net Worth)
+#  Face 2: slow start (1 AP, 0)
+#  Face 3–4: normal (2 AP, 0)
+#  Face 5: hot (3 AP, 0)
+#  Face 6: lucky break (3 AP, +5% Net Worth)
 DICE_OUTCOMES = [
     {
-        "ap": 2, "cash": -1_500, "tone": "bad",
+        "ap": 1, "penalty_pct": 0.10, "tone": "bad",
         "flavors": [
-            "Tenant ghosted you this month. Lose $1,500 in skipped rent.",
-            "Pipe burst on the third floor. Emergency plumber charged $1,500.",
-            "Surprise city inspection fine. -$1,500, fight it next quarter.",
-            "Your cousin's 'can't-miss' pitch fell apart. You lose $1,500.",
-            "Broker 'accidentally' double-billed you. -$1,500 until it clears.",
+            "Market downturn! Your liquid reserves took a 10% hit.",
+            "Unexpected lawsuit settlements. Lose 10% of net worth.",
+            "Aggressive tax audit penalty. -10% cash equivalent.",
+            "Cyber-heist on your offshore account. 10% drained.",
         ],
     },
     {
-        "ap": 2, "cash": 0, "tone": "slow",
+        "ap": 1, "cash": 0, "tone": "slow",
         "flavors": [
-            "Slow week. Phones quiet, deals frozen. Only 2 AP.",
-            "Coffee machine broke. Morale tanked. 2 AP.",
-            "Market's holding its breath. You manage 2 AP today.",
+            "Slow week. Phones quiet, deals frozen. Only 1 AP.",
+            "Coffee machine broke. Morale tanked. 1 AP.",
+            "Market's holding its breath. You manage 1 AP today.",
         ],
     },
     {
-        "ap": 3, "cash": 0, "tone": "neutral",
+        "ap": 2, "cash": 0, "tone": "neutral",
         "flavors": [
-            "Solid grind. 3 AP on the board.",
-            "Three meetings, three moves. 3 AP.",
-            "Average day at the office. 3 AP.",
+            "Solid grind. 2 AP on the board.",
+            "Two meetings, two moves. 2 AP.",
+            "Average day at the office. 2 AP.",
         ],
     },
     {
-        "ap": 4, "cash": 0, "tone": "neutral",
+        "ap": 2, "cash": 0, "tone": "neutral",
         "flavors": [
-            "You're dialed in today. 4 AP.",
-            "Good coffee, better instincts. 4 AP to spend.",
-            "Momentum building — 4 AP.",
+            "Steady hands. 2 AP to spend.",
+            "The market is moving, but you're keeping pace. 2 AP.",
         ],
     },
     {
-        "ap": 5, "cash": 0, "tone": "hot",
+        "ap": 3, "cash": 0, "tone": "hot",
         "flavors": [
-            "Firing on all cylinders. 5 AP.",
-            "Your assistant triple-booked you in the best way. 5 AP.",
-            "Everyone's returning your calls. 5 AP.",
+            "Firing on all cylinders. 3 AP.",
+            "Good coffee, better instincts. 3 AP to spend.",
+            "Everyone's returning your calls. 3 AP.",
         ],
     },
     {
-        "ap": 5, "cash": 1_000, "tone": "lucky",
+        "ap": 3, "bonus_pct": 0.05, "tone": "lucky",
         "flavors": [
-            "Found $1,000 of uncashed rent checks in a drawer. Bonus cash + 5 AP.",
-            "Your tweet about the neighborhood went viral. +$1,000 referral. 5 AP.",
-            "Local paper featured your building. +$1,000 in ad revenue. 5 AP.",
-            "Tenant paid a year up-front on a hunch. +$1,000 float, 5 AP.",
+            "Unicorn exit! Your small side-bet pays off with a 5% net worth boost.",
+            "Found uncashed dividends in a drawer. Bonus 5% net worth.",
+            "Your tweet about the neighborhood went viral. +5% bonus cash.",
+            "Tax rebate arrives early. +5% boost.",
         ],
     },
 ]
@@ -116,6 +115,14 @@ def _calc_net_worth(db: Session, player: Player) -> int:
         for p in props
     )
     return player.cash + portfolio - player.debt
+
+
+def _normalize_finances(player: Player) -> None:
+    """If cash is negative, convert the deficit into debt (overdraft)."""
+    if player.cash < 0:
+        deficit = abs(player.cash)
+        player.debt += deficit
+        player.cash = 0
 
 
 # ──────────────────────────────────────────────
@@ -157,7 +164,7 @@ def create_new_game(db: Session, session_id: str) -> GameState:
         id=f"{session_id}_flipper",
         game_id=session_id,
         role="FLIPPER",
-        cash=BALANCE.STARTING_CASH * 2,
+        cash=int(BALANCE.STARTING_CASH * 1.5),
     )
     db.add_all([user, flipper])
 
@@ -248,12 +255,16 @@ def start_turn(db: Session, game: GameState) -> dict:
     Returns dict with ap, dice_roll, cash_delta, flavor, low_roll, and new listings.
     """
     newly_listed = []
+    user_interest_paid = 0
 
     # 1. Debt interest (deducted from cash at START of turn)
     for p in db.query(Player).filter(Player.game_id == game.id).all():
         if p.debt > 0 and not p.is_bankrupt:
             interest = int(p.debt * BALANCE.MORTGAGE_INTEREST_RATE)
             p.cash -= interest
+            _normalize_finances(p)
+            if p.role == "USER":
+                user_interest_paid = interest
 
     # 2. Drip-feed property listings (unlock properties scheduled for this turn)
     props = db.query(Property).filter(
@@ -271,9 +282,29 @@ def start_turn(db: Session, game: GameState) -> dict:
 
     # 3. Storyline dice: 1d6 → AP, cash swing, flavor text
     face = random.randint(1, 6)
+    
+    # Force a neutral start for turn 1
+    if game.turn == 1:
+        face = 3 # Neutral (2 AP, $0 delta)
+
     outcome = DICE_OUTCOMES[face - 1]
     rolled_ap = outcome["ap"]
-    cash_delta = outcome["cash"]
+
+    # Calculate dynamic cash delta based on Net Worth percentages
+    user = db.query(Player).filter(
+        Player.game_id == game.id, Player.role == "USER"
+    ).first()
+
+    cash_delta = 0
+    if user and not user.is_bankrupt:
+        nw = _calc_net_worth(db, user)
+        if "penalty_pct" in outcome:
+            cash_delta = -int(nw * outcome["penalty_pct"])
+        elif "bonus_pct" in outcome:
+            cash_delta = int(nw * outcome["bonus_pct"])
+        else:
+            cash_delta = outcome.get("cash", 0)
+
     flavor = random.choice(outcome["flavors"])
     tone = outcome["tone"]
 
@@ -282,17 +313,16 @@ def start_turn(db: Session, game: GameState) -> dict:
 
     # Apply storyline cash delta to the human player only (AI is unaffected).
     if cash_delta:
-        user = db.query(Player).filter(
-            Player.game_id == game.id, Player.role == "USER"
-        ).first()
         if user and not user.is_bankrupt:
             user.cash += cash_delta
+            _normalize_finances(user)
 
     db.commit()
     return {
         "ap": rolled_ap,
         "dice_roll": face,
         "cash_delta": cash_delta,
+        "interest_paid": user_interest_paid,
         "flavor": flavor,
         "tone": tone,
         "low_roll": is_low_roll,
@@ -473,8 +503,10 @@ def develop_property(db: Session, game: GameState, player: Player, property_id: 
         return {"success": False, "error": "Property not found"}
     if prop.owner_id != player.id:
         return {"success": False, "error": "You don't own this property"}
-    if prop.dev_level >= BALANCE.MAX_DEV_LEVEL:
-        return {"success": False, "error": "Property already at max development (level 3)"}
+    
+    tier_cap = BALANCE.TIER_DEV_CAPS.get(prop.tier, 0)
+    if prop.dev_level >= tier_cap:
+        return {"success": False, "error": f"{prop.tier.capitalize()} properties are capped at level {tier_cap}"}
 
     cost = _calc_dev_cost(prop.market_value)
     if player.cash < cost:
@@ -495,6 +527,43 @@ def develop_property(db: Session, game: GameState, player: Player, property_id: 
         "cost": cost,
         "new_rent": prop.rent_value,
         "new_market_value": prop.market_value,
+        "cash_remaining": player.cash,
+        "ap_remaining": game.current_ap,
+    }
+
+
+def sell_property(db: Session, game: GameState, player: Player, property_id: str) -> dict:
+    """
+    Sell action (1 AP):
+      - Must own the property
+      - Returns 90% of current market value
+      - Property is listed back on the market with a fresh expiry turn
+    """
+    if time_err := _check_time(game): return time_err
+
+    if game.current_ap < 1:
+        return {"success": False, "error": "Not enough AP (need 1)"}
+
+    prop = db.query(Property).filter(Property.id == property_id).first()
+    if not prop:
+        return {"success": False, "error": "Property not found"}
+    if prop.owner_id != player.id:
+        return {"success": False, "error": "You don't own this property"}
+
+    payout = int(prop.market_value * 0.9)
+    
+    # Execute sale
+    player.cash += payout
+    prop.owner_id = None
+    prop.is_listed = True
+    prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
+    game.current_ap -= 1
+
+    db.commit()
+    return {
+        "success": True,
+        "property": prop.name,
+        "payout": payout,
         "cash_remaining": player.cash,
         "ap_remaining": game.current_ap,
     }
@@ -617,16 +686,19 @@ def answer_trivia(db: Session, game: GameState, player: Player, answer_index: in
                 "duration": catalyst.duration,
                 "copy": catalyst.copy,
             }
+            # Reward: City Grant for correct research
+            player.cash += BALANCE.RESEARCH_REWARD_CASH
         else:
-            # Misleading: flip the direction in the hint
-            flipped = "boom" if catalyst.direction == "bust" else "bust"
+            # Partial Intel: Reveal theme/category but hide direction/effects
             intel = {
                 "theme": catalyst.theme,
-                "direction": flipped,
+                "direction": "unknown",
                 "fires_on_turn": None,
-                "misleading": True,
-                "copy": "Bad intel — your source was unreliable.",
+                "partial": True,
+                "copy": f"Something is brewing related to {catalyst.theme}...",
             }
+            # Consolation Prize: Selling failed research notes
+            player.cash += 200
 
     # Restore the speed timer with whatever time remained when research started.
     if session.paused_remaining_secs is not None and session.paused_remaining_secs > 0:
