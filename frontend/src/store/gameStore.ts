@@ -41,7 +41,6 @@ export interface PropertyMeta {
   unlockTurn: number;
   expiryTurn: number | null;
   ownerRole: OwnerRole;
-  flipperTarget: boolean;
   flipperAcquireTurn: number | null;
   marketValue: number;
   rentValue: number;
@@ -56,6 +55,7 @@ interface GameStore {
   netWorth: number;
   isBankrupt: boolean;
   maxTurns: number;
+  turnExpiresAt: number | null;
   flipperProps: number;
   flipperCash: number;
   ownedPropertyIds: string[];
@@ -72,6 +72,7 @@ interface GameStore {
   resumeGame: () => Promise<void>;
   rollAP: () => Promise<void>;
   selectProperty: (id: string | null) => void;
+  activateTimer: () => Promise<void>;
   buyProperty: () => Promise<void>;
   developProperty: () => Promise<void>;
   researchProperty: () => Promise<void>;
@@ -99,6 +100,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   netWorth: 22_000,
   isBankrupt: false,
   maxTurns: 20,
+  turnExpiresAt: null,
   flipperProps: 0,
   flipperCash: 0,
   ownedPropertyIds: [],
@@ -168,6 +170,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     await get().refreshStatus();
   },
 
+  activateTimer: async () => {
+    await fetch(`${API}/${SESSION}/turn/activate_timer`, { method: "POST" });
+    await get().refreshStatus();
+  },
+
   selectProperty: (id) => set({ selectedPropertyId: id }),
 
   buyProperty: async () => {
@@ -191,9 +198,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (res.ok) {
       set({ selectedPropertyId: null });
       await get().refreshStatus();
+      get().addToast(`Property acquired: ${selectedPropertyId.replace(/_/g, " ")}`, "success");
     } else {
       const err = await res.json();
-      alert(err.detail || "Cannot buy this property");
+      get().addToast(err.detail || "Cannot buy this property", "danger");
     }
     set({ loading: false });
   },
@@ -295,7 +303,6 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         unlockTurn: p.unlock_turn,
         expiryTurn: p.expiry_turn,
         ownerRole,
-        flipperTarget: Boolean(p.is_flipper_target),
         flipperAcquireTurn: p.flipper_acquire_turn,
         marketValue: p.market_value,
         rentValue: p.rent_value,
@@ -310,6 +317,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       netWorth: data.player.net_worth,
       isBankrupt: data.player.is_bankrupt,
       maxTurns: data.max_turns,
+      turnExpiresAt: data.turn_expires_at,
       flipperCash: data.flipper.cash,
       flipperProps: data.properties.filter((p: any) => p.owner_id === flipperId).length,
       // Don't reveal AP while the dice modal is still up — let rollAP set it.
@@ -329,7 +337,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   },
 
   setTriviaOpen: (open) => set({ triviaOpen: open }),
-  setPauseOpen: (open) => set({ pauseOpen: open }),
+  setPauseOpen: async (open) => {
+    set({ pauseOpen: open });
+    const endpoint = open ? "pause" : "resume";
+    await fetch(`${API}/${SESSION}/${endpoint}`, { method: "POST" });
+    await get().refreshStatus();
+  },
 
   addToast: (message, variant = "info") => {
     const id = ++toastId;

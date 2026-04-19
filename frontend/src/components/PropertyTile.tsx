@@ -8,10 +8,9 @@ const ROW_Y = 56;
 interface Props {
   property: Property;
   position: GridPos;
-  unlocked: boolean;
 }
 
-export default function PropertyTile({ property, position, unlocked }: Props) {
+export default function PropertyTile({ property, position }: Props) {
   const selectedId = useGameStore((s) => s.selectedPropertyId);
   const selectProperty = useGameStore((s) => s.selectProperty);
   const meta = useGameStore((s) => s.propertyMeta[property.id]);
@@ -31,9 +30,6 @@ export default function PropertyTile({ property, position, unlocked }: Props) {
 
   const isLocked = !isInteractive && turn < (meta?.unlockTurn ?? 0);
   const isExpired = !isInteractive && !isLocked;
-
-  const showFlipperEyes =
-    Boolean(meta?.flipperTarget) && !isOwned && !isRivalOwned;
 
   const baseX = position.row === 1 ? 0 : ROW_STAGGER_X;
   const x = baseX + position.col * TILE_W;
@@ -77,9 +73,15 @@ export default function PropertyTile({ property, position, unlocked }: Props) {
       <div className="tile__hitbox tile__hitbox--base" />
       <div className="tile__hitbox tile__hitbox--left" />
       <div className="tile__hitbox tile__hitbox--mid-left" />
+      <div className="tile__hitbox tile__hitbox--outer-upper-left" />
+      <div className="tile__hitbox tile__hitbox--upper-left" />
+      <div className="tile__hitbox tile__hitbox--inner-upper-left" />
       <div className="tile__hitbox tile__hitbox--lower-left" />
       <div className="tile__hitbox tile__hitbox--right" />
       <div className="tile__hitbox tile__hitbox--mid-right" />
+      <div className="tile__hitbox tile__hitbox--outer-upper-right" />
+      <div className="tile__hitbox tile__hitbox--upper-right" />
+      <div className="tile__hitbox tile__hitbox--inner-upper-right" />
       <div className="tile__hitbox tile__hitbox--lower-right" />
       <div className="tile__hitbox tile__hitbox--bottom" />
       <div className="tile__hitbox tile__hitbox--lower" />
@@ -98,15 +100,6 @@ export default function PropertyTile({ property, position, unlocked }: Props) {
           aria-label="Expiring soon"
         >
           ⏳
-        </span>
-      )}
-
-      {showFlipperEyes && (
-        <span
-          className="tile__badge tile__badge--eyes"
-          aria-label="Flipper is targeting this property"
-        >
-          👀
         </span>
       )}
 

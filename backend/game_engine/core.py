@@ -3,6 +3,7 @@ Core game engine — state initialization, turn lifecycle, and player actions.
 All math aligned to architecture.md config constants.
 """
 import random
+import time
 from sqlalchemy.orm import Session
 from backend.models.core import GameState, Player, Property
 from backend.config import BALANCE
@@ -122,6 +123,44 @@ def create_new_game(db: Session, session_id: str) -> GameState:
 #  TURN LIFECYCLE
 # ──────────────────────────────────────────────
 
+def _check_time(game: GameState) -> dict | None:
+    """Helper to reject actions if the speed timer has run out."""
+    if game.is_paused:
+        return None
+    if game.turn_expires_at and time.time() > game.turn_expires_at:
+        return {"success": False, "error": "Turn time expired (Speed Tycoon mode)"}
+    return None
+
+
+def pause_game(db: Session, game: GameState) -> dict:
+    """Freeze the speed timer."""
+    if game.turn_expires_at:
+        game.timer_remaining_at_pause = max(0, game.turn_expires_at - time.time())
+        game.turn_expires_at = None
+    
+    game.is_paused = True
+    db.commit()
+    return {"success": True, "remaining": game.timer_remaining_at_pause}
+
+
+def resume_game(db: Session, game: GameState) -> dict:
+    """Unfreeze the speed timer."""
+    if game.timer_remaining_at_pause is not None:
+        game.turn_expires_at = time.time() + game.timer_remaining_at_pause
+        game.timer_remaining_at_pause = None
+    
+    game.is_paused = False
+    db.commit()
+    return {"success": True, "expires_at": game.turn_expires_at}
+
+
+def activate_timer(db: Session, game: GameState) -> dict:
+    """Explicitly start the 40-second speed timer."""
+    game.turn_expires_at = time.time() + BALANCE.TURN_TIME_LIMIT
+    db.commit()
+    return {"success": True, "expires_at": game.turn_expires_at}
+
+
 def start_turn(db: Session, game: GameState) -> dict:
     """
     Start-of-turn sequence (architecture.md §2):
@@ -239,6 +278,8 @@ def end_turn(db: Session, game: GameState) -> dict:
     else:
         game.turn += 1
         game.current_ap = 0 # AP resets
+    
+    game.turn_expires_at = None # Reset timer
 
     # 6. AI Scan: flag next-turn targets so the 👀 icon is visible immediately.
     ai_scan_phase(db, game)
@@ -266,6 +307,8 @@ def buy_property(db: Session, game: GameState, player: Player, property_id: str)
       - Player must have enough cash
       - Deducts cash, assigns ownership, delists
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 
@@ -311,6 +354,8 @@ def develop_property(db: Session, game: GameState, player: Player, property_id: 
       - Cost = $500 + 15% × market_value
       - Increases dev_level, recalculates rent and market value
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 
@@ -352,6 +397,8 @@ def research_action(db: Session, game: GameState, player: Player, property_id: s
       - Reveals intel about a property or upcoming catalyst
       - Full trivia engine is Phase 5; this is a working stub
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 

@@ -1,4 +1,5 @@
 import { useGameStore } from "../store/gameStore";
+import { PROPERTIES } from "../data/properties";
 
 export default function Announcements() {
   const turn = useGameStore((s) => s.turn);
@@ -11,9 +12,10 @@ export default function Announcements() {
     const meta = propertyMeta[id];
     if (meta && meta.expiryTurn != null) {
       const turnsLeft = meta.expiryTurn - turn;
-      // Triggers EXACTLY when a property has 1 turn left
-      if (turnsLeft === 1) {
-        announcements.push(`Warning: A property leaves the market NEXT TURN! (Look for the ⏳)`);
+      
+      // Triggers EXACTLY when a property is on its FINAL turn
+      if (turnsLeft === 0) {
+        announcements.push(`CRITICAL: A property leaves the market at the end of THIS TURN! (⏳)`);
       }
     }
   });

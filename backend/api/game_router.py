@@ -44,6 +44,30 @@ def end_turn(session_id: str, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/{session_id}/turn/activate_timer")
+def activate_timer(session_id: str, db: Session = Depends(get_db)):
+    """Start the 40-second speed timer after the player proceeds from the dice roll."""
+    game = _get_game(db, session_id)
+    result = engine.activate_timer(db, game)
+    return result
+
+
+@router.post("/{session_id}/pause")
+def pause_game(session_id: str, db: Session = Depends(get_db)):
+    """Freeze the speed timer."""
+    game = _get_game(db, session_id)
+    result = engine.pause_game(db, game)
+    return result
+
+
+@router.post("/{session_id}/resume")
+def resume_game_timer(session_id: str, db: Session = Depends(get_db)):
+    """Unfreeze the speed timer."""
+    game = _get_game(db, session_id)
+    result = engine.resume_game(db, game)
+    return result
+
+
 # ── Player actions (each costs 1 AP) ───────
 
 @router.post("/{session_id}/action/buy")
@@ -96,6 +120,7 @@ def get_status(session_id: str, db: Session = Depends(get_db)):
         "turn": game.turn,
         "max_turns": game.max_turns,
         "ap_remaining": game.current_ap,
+        "turn_expires_at": game.turn_expires_at,
         "finance_tier": game.finance_tier,
         "player": {
             "cash": user.cash,

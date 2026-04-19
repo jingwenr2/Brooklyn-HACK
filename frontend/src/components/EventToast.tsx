@@ -32,15 +32,17 @@ export default function EventToast() {
           style={{
             background: "var(--color-panel-bg)",
             border: `2px solid ${VARIANT_COLORS[t.variant] ?? VARIANT_COLORS.info}`,
-            padding: "8px 14px",
-            fontFamily: "var(--font-display)",
-            fontSize: 9,
+            padding: "10px 16px",
+            fontFamily: "var(--font-body)",
+            fontSize: 18,
             color: "var(--color-text-main)",
-            maxWidth: 320,
+            maxWidth: 360,
             pointerEvents: "auto",
             cursor: "pointer",
             animation: "fade-in 0.2s ease-out",
-            letterSpacing: 1,
+            letterSpacing: 0.5,
+            lineHeight: "1.2",
+            boxShadow: "4px 4px 0 rgba(0,0,0,0.3)"
           }}
           onClick={() => dismissToast(t.id)}
         >

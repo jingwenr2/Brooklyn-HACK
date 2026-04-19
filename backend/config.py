@@ -14,6 +14,7 @@ class Balance:
     # --- STARTING ---
     STARTING_CASH: int = 22_000
     MAX_TURNS: int = 20
+    TURN_TIME_LIMIT: int = 40
     EARLY_WIN_TURN: int = 10
     EARLY_WIN_NET_WORTH: int = 100_000
     EARLY_WIN_MIN_PROPERTIES: int = 3

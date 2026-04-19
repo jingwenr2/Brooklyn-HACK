@@ -12,6 +12,8 @@ class GameState(Base):
     current_ap = Column(Integer, default=0)
     finance_tier = Column(Integer, default=1)
     is_paused = Column(Boolean, default=False)
+    turn_expires_at = Column(Float, nullable=True) # Timestamp for speed timer
+    timer_remaining_at_pause = Column(Float, nullable=True) # Seconds remaining when paused
 
     # Relationships
     players = relationship("Player", back_populates="game")

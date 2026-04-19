@@ -6,6 +6,7 @@ import PlayerCard from "../components/PlayerCard";
 import RivalCard from "../components/RivalCard";
 import TopBar from "../components/TopBar";
 import Announcements from "../components/Announcements";
+import TurnTimer from "../components/TurnTimer";
 import Portfolio from "../components/Portfolio";
 import GameOverScreen from "../components/GameOverScreen";
 import PauseMenu from "../components/PauseMenu";
@@ -71,6 +72,7 @@ export default function GameScreen() {
 
         <section className="game__center">
           <DistrictBoard />
+          <TurnTimer />
         </section>
 
         <section className="game__right">
