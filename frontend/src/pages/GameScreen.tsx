@@ -66,6 +66,7 @@ export default function GameScreen() {
         <section className="game__left">
           <PlayerCard />
           <Portfolio />
+          <BluffBar />
         </section>
 
         <section className="game__center">
@@ -74,7 +75,6 @@ export default function GameScreen() {
 
         <section className="game__right">
           <RivalCard />
-          <BluffBar />
           <div className="action-panel">
             <h2 className="card__label">== ACTIONS ==</h2>
 
