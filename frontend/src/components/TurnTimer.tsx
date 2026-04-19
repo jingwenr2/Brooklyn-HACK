@@ -5,10 +5,11 @@ export default function TurnTimer() {
   const turnExpiresAt = useGameStore((s) => s.turnExpiresAt);
   const endTurn = useGameStore((s) => s.endTurn);
   const pauseOpen = useGameStore((s) => s.pauseOpen);
+  const triviaOpen = useGameStore((s) => s.triviaOpen);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!turnExpiresAt || pauseOpen) {
+    if (!turnExpiresAt || pauseOpen || triviaOpen) {
       return;
     }
 
@@ -25,7 +26,7 @@ export default function TurnTimer() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [turnExpiresAt, endTurn, pauseOpen]);
+  }, [turnExpiresAt, endTurn, pauseOpen, triviaOpen]);
 
   if (timeLeft === null && !turnExpiresAt) return null;
   

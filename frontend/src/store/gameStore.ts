@@ -284,6 +284,8 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         },
         triviaOpen: true,
       });
+      // Pull fresh state so ap_remaining (1 spent) and frozen turn_expires_at are reflected.
+      await get().refreshStatus();
     } else {
       const err = await res.json();
       get().addToast(err.detail || "Research failed", "danger");

@@ -6,7 +6,7 @@ import json
 import random
 import time
 from sqlalchemy.orm import Session
-from backend.models.core import Catalyst, GameState, Player, Property, TriviaSession
+from backend.models.core import Catalyst, GameState, Player, PregenTrivia, Property, TriviaSession
 from backend.config import BALANCE
 import backend.config as config
 from backend.game_engine.ai.base import Action, RivalStrategy
@@ -69,6 +69,7 @@ def create_new_game(db: Session, session_id: str) -> GameState:
     """Initializes a new game: players + 10 property plots."""
 
     # Wipe any existing session
+    db.query(PregenTrivia).filter(PregenTrivia.game_id == session_id).delete()
     db.query(TriviaSession).filter(TriviaSession.game_id == session_id).delete()
     db.query(Catalyst).filter(Catalyst.game_id == session_id).delete()
     db.query(Property).filter(Property.game_id == session_id).delete()
@@ -419,9 +420,10 @@ def research_action(
     """
     Research action (1 AP) — step 1 of 2:
       - Picks a future catalyst to quiz the player about
-      - Generates a trivia question (OpenAI or fallback)
-      - Stores a TriviaSession for this player; AP is NOT deducted yet —
-        the AP is spent when the player submits an answer.
+      - Uses a pre-generated trivia question if available (instant), otherwise
+        falls back to a synchronous OpenAI call
+      - Freezes the speed timer so the modal doesn't time out
+      - AP is NOT deducted yet — that happens on answer submission
     """
     if time_err := _check_time(game): return time_err
 
@@ -432,16 +434,42 @@ def research_action(
     if not prop:
         return {"success": False, "error": "Property not found"}
 
-    # If there's already an open session, return that instead of generating a new one.
+    # If there's already an open session, return it (idempotent retry).
     existing = db.query(TriviaSession).filter(TriviaSession.id == player.id).first()
     if existing:
-        return _trivia_session_response(existing)
+        return _trivia_session_response(existing, game)
 
     catalyst = pick_catalyst_for_research(db, game)
     if catalyst is None:
         return {"success": False, "error": "No catalysts left to research — game is too late"}
 
-    q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty=difficulty)
+    # Fast path: use a pre-generated question if one exists for this catalyst.
+    pregen_id = f"{game.id}_{catalyst.id}"
+    pregen = db.query(PregenTrivia).filter(PregenTrivia.id == pregen_id).first()
+    if pregen:
+        q_question = pregen.question
+        q_options_json = pregen.options_json
+        q_correct_index = pregen.correct_index
+        q_category = pregen.category
+        q_source = pregen.source
+        db.delete(pregen)
+    else:
+        q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty=difficulty)
+        q_question = q.question
+        q_options_json = json.dumps(q.options)
+        q_correct_index = q.correct_index
+        q_category = q.category
+        q_source = q.source
+
+    # Freeze the speed timer — capture how much time was left so we can restore it.
+    remaining = None
+    if game.turn_expires_at:
+        remaining = max(0.0, game.turn_expires_at - time.time())
+        game.turn_expires_at = None
+
+    # Spend AP up-front so the modal can always be completed, even if the
+    # player sits idle past the turn timer in another browser tab.
+    game.current_ap -= 1
 
     session = TriviaSession(
         id=player.id,
@@ -449,17 +477,18 @@ def research_action(
         player_id=player.id,
         catalyst_id=catalyst.id,
         property_id=property_id,
-        question=q.question,
-        options_json=json.dumps(q.options),
-        correct_index=q.correct_index,
-        category=q.category,
-        source=q.source,
+        question=q_question,
+        options_json=q_options_json,
+        correct_index=q_correct_index,
+        category=q_category,
+        source=q_source,
         created_turn=game.turn,
+        paused_remaining_secs=remaining,
     )
     db.add(session)
     db.commit()
 
-    return _trivia_session_response(session)
+    return _trivia_session_response(session, game)
 
 
 def answer_trivia(db: Session, game: GameState, player: Player, answer_index: int) -> dict:
@@ -468,20 +497,18 @@ def answer_trivia(db: Session, game: GameState, player: Player, answer_index: in
       - Validates the submitted answer against the active TriviaSession
       - Correct: reveals the catalyst (theme + direction + effects + turn)
       - Wrong: returns misleading intel (flipped direction); AP is still spent
-      - Deducts 1 AP on resolution and clears the session
+      - Deducts 1 AP, restores the speed timer with the remaining time, clears session
     """
     session = db.query(TriviaSession).filter(TriviaSession.id == player.id).first()
     if not session:
         return {"success": False, "error": "No active research question"}
 
-    if game.current_ap < 1:
-        return {"success": False, "error": "Not enough AP to resolve research"}
+    # AP was already spent in research_action; no check needed here.
 
     catalyst = db.query(Catalyst).filter(Catalyst.id == session.catalyst_id).first()
     prop = db.query(Property).filter(Property.id == session.property_id).first()
 
     correct = answer_index == session.correct_index
-    game.current_ap -= 1
 
     intel: dict = {}
     if catalyst:
@@ -507,21 +534,72 @@ def answer_trivia(db: Session, game: GameState, player: Player, answer_index: in
                 "copy": "Bad intel — your source was unreliable.",
             }
 
+    # Restore the speed timer with whatever time remained when research started.
+    if session.paused_remaining_secs is not None and session.paused_remaining_secs > 0:
+        game.turn_expires_at = time.time() + session.paused_remaining_secs
+
     # Clear the session regardless
+    correct_index_snapshot = session.correct_index
     db.delete(session)
     db.commit()
 
     return {
         "success": True,
         "correct": correct,
-        "correct_index": session.correct_index,
+        "correct_index": correct_index_snapshot,
         "property": prop.name if prop else None,
         "intel": intel,
         "ap_remaining": game.current_ap,
     }
 
 
-def _trivia_session_response(session: TriviaSession) -> dict:
+def pregen_next_trivia(session_id: str) -> None:
+    """
+    Background task: generate a trivia question for the next unrevealed catalyst
+    and cache it in PregenTrivia. Safe to call from FastAPI's BackgroundTasks —
+    opens its own DB session so it doesn't tangle with the request's session.
+    """
+    from backend.database import SessionLocal  # local import to avoid cycles at module load
+
+    db = SessionLocal()
+    try:
+        game = db.query(GameState).filter(GameState.id == session_id).first()
+        if not game:
+            return
+
+        catalyst = db.query(Catalyst).filter(
+            Catalyst.game_id == session_id,
+            Catalyst.status == "pending",
+            Catalyst.revealed == False,
+            Catalyst.scheduled_turn > game.turn,
+        ).order_by(Catalyst.scheduled_turn.asc()).first()
+        if not catalyst:
+            return
+
+        pregen_id = f"{session_id}_{catalyst.id}"
+        if db.query(PregenTrivia).filter(PregenTrivia.id == pregen_id).first():
+            return  # already cached
+
+        q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty="medium")
+        db.add(PregenTrivia(
+            id=pregen_id,
+            game_id=session_id,
+            catalyst_id=catalyst.id,
+            question=q.question,
+            options_json=json.dumps(q.options),
+            correct_index=q.correct_index,
+            category=q.category,
+            source=q.source,
+            created_turn=game.turn,
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _trivia_session_response(session: TriviaSession, game: GameState | None = None) -> dict:
     return {
         "success": True,
         "trivia": {
@@ -532,6 +610,8 @@ def _trivia_session_response(session: TriviaSession) -> dict:
             "source": session.source,
             "property_id": session.property_id,
         },
+        "ap_remaining": game.current_ap if game is not None else None,
+        "turn_expires_at": game.turn_expires_at if game is not None else None,
     }
 
 
