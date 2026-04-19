@@ -14,6 +14,7 @@ class Balance:
     # --- STARTING ---
     STARTING_CASH: int = 22_000
     MAX_TURNS: int = 20
+    TURN_TIME_LIMIT: int = 40
     EARLY_WIN_TURN: int = 10
     EARLY_WIN_NET_WORTH: int = 100_000
     EARLY_WIN_MIN_PROPERTIES: int = 3
@@ -27,7 +28,8 @@ class Balance:
     LOW_ROLL_PENALTY_CASH: int = 4_000
 
     # --- TENSION MECHANICS ---
-    PROPERTY_EXPIRY_TURNS: int = 5
+    PROPERTY_EXPIRY_MIN_TURNS: int = 3
+    PROPERTY_EXPIRY_MAX_TURNS: int = 6
     FLIPPER_EYES_WARN_TURNS_EASY: int = 2
     FLIPPER_EYES_WARN_TURNS_HARD: int = 1
     CASH_DANGER_THRESHOLD: float = 1.0

@@ -8,10 +8,9 @@ const ROW_Y = 56;
 interface Props {
   property: Property;
   position: GridPos;
-  unlocked: boolean;
 }
 
-export default function PropertyTile({ property, position, unlocked }: Props) {
+export default function PropertyTile({ property, position }: Props) {
   const selectedId = useGameStore((s) => s.selectedPropertyId);
   const selectProperty = useGameStore((s) => s.selectProperty);
   const meta = useGameStore((s) => s.propertyMeta[property.id]);
@@ -23,27 +22,28 @@ export default function PropertyTile({ property, position, unlocked }: Props) {
   const isRivalOwned = ownerRole === "FLIPPER";
   const isListed = meta?.listed ?? false;
 
-  // Expiry countdown: show when listed and ≤5 turns from expiring.
-  const turnsUntilExpiry =
-    isListed && meta?.expiryTurn != null ? meta.expiryTurn - turn : null;
-  const showExpiry =
-    turnsUntilExpiry != null && turnsUntilExpiry > 0 && turnsUntilExpiry <= 5;
+  const turnsUntilExpiry = isListed && meta?.expiryTurn != null ? meta.expiryTurn - turn : null;
+  const isExpiringSoon = turnsUntilExpiry === 0;
 
-  const showFlipperEyes =
-    Boolean(meta?.flipperTarget) && !isOwned && !isRivalOwned;
+  const isAvailable = isListed && !isOwned && !isRivalOwned;
+  const isInteractive = isAvailable || isOwned || isRivalOwned;
+
+  const isLocked = !isInteractive && turn < (meta?.unlockTurn ?? 0);
+  const isExpired = !isInteractive && !isLocked;
 
   const baseX = position.row === 1 ? 0 : ROW_STAGGER_X;
   const x = baseX + position.col * TILE_W;
   const y = position.row * ROW_Y;
-  const z = isSelected ? 200 : position.row * 10 + position.col;
+  const z = position.row * 10 + position.col;
 
   const handleClick = () => {
-    if (!unlocked) return;
+    if (!isInteractive) return;
     selectProperty(isSelected ? null : property.id);
   };
 
   let tileClass = "tile";
-  if (!unlocked) tileClass += " tile--locked";
+  if (isLocked) tileClass += " tile--locked";
+  if (isExpired) tileClass += " tile--expired";
   if (isSelected) tileClass += " tile--selected";
   if (isOwned) tileClass += " tile--owned-you";
   if (isRivalOwned) tileClass += " tile--owned-rival";
@@ -53,33 +53,53 @@ export default function PropertyTile({ property, position, unlocked }: Props) {
       type="button"
       className={tileClass}
       style={{ left: x, top: y, zIndex: z }}
-      title={`${property.name} — $${property.baseValue.toLocaleString()}${
-        isOwned ? " (YOU)" : isRivalOwned ? " (FLIPPER)" : isListed ? " (AVAILABLE)" : ""
-      }`}
-      disabled={!unlocked}
+      title={`${property.name} — $${property.baseValue.toLocaleString()}${isOwned ? " (YOU)" : isRivalOwned ? " (FLIPPER)" : isAvailable ? " (AVAILABLE)" : isLocked ? " (LOCKED)" : " (OFF-MARKET)"
+        }`}
       onClick={handleClick}
     >
       <div className="tile__shadow" />
       <div className="tile__base" />
       <img src={property.sprite} alt={property.name} className="tile__sprite" />
 
-      {showExpiry && (
-        <span
-          className={`tile__badge tile__badge--expiry ${
-            turnsUntilExpiry! <= 2 ? "tile__badge--danger" : ""
-          }`}
-          aria-label={`Expires in ${turnsUntilExpiry} turns`}
-        >
-          {turnsUntilExpiry}
-        </span>
+      {/* Status Badges for non-interactive tiles */}
+      {isLocked && (
+        <span className="tile__badge tile__badge--status">LOCKED</span>
+      )}
+      {isExpired && (
+        <span className="tile__badge tile__badge--status tile__badge--expired">OFF-MARKET</span>
       )}
 
-      {showFlipperEyes && (
+      {/* Precise Hitboxes */}
+      <div className="tile__hitbox tile__hitbox--base" />
+      <div className="tile__hitbox tile__hitbox--left" />
+      <div className="tile__hitbox tile__hitbox--mid-left" />
+      <div className="tile__hitbox tile__hitbox--outer-upper-left" />
+      <div className="tile__hitbox tile__hitbox--upper-left" />
+      <div className="tile__hitbox tile__hitbox--inner-upper-left" />
+      <div className="tile__hitbox tile__hitbox--lower-left" />
+      <div className="tile__hitbox tile__hitbox--right" />
+      <div className="tile__hitbox tile__hitbox--mid-right" />
+      <div className="tile__hitbox tile__hitbox--outer-upper-right" />
+      <div className="tile__hitbox tile__hitbox--upper-right" />
+      <div className="tile__hitbox tile__hitbox--inner-upper-right" />
+      <div className="tile__hitbox tile__hitbox--lower-right" />
+      <div className="tile__hitbox tile__hitbox--bottom" />
+      <div className="tile__hitbox tile__hitbox--lower" />
+      <div className="tile__hitbox tile__hitbox--mid" />
+      <div className="tile__hitbox tile__hitbox--top" />
+
+      {isSelected && (
+        <div className="tile__selection-indicator" aria-hidden="true">
+          <div className="tile__selection-pyramid" />
+        </div>
+      )}
+
+      {isExpiringSoon && (
         <span
-          className="tile__badge tile__badge--eyes"
-          aria-label="Flipper is targeting this property"
+          className="tile__badge tile__badge--danger tile__badge--pulse"
+          aria-label="Expiring soon"
         >
-          👀
+          ⏳
         </span>
       )}
 

@@ -26,8 +26,17 @@ export const PROPERTIES: Property[] = [
 ];
 
 // 3-4-3 staggered diamond. Row 1 is the wide middle row.
-export const BOARD_POSITIONS: GridPos[] = [
+export const BASE_POSITIONS: GridPos[] = [
   { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
   { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 },
   { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 },
 ];
+
+export function shufflePositions(array: GridPos[]): GridPos[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}

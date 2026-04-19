@@ -1,0 +1,112 @@
+{
+  "gaming": [
+    {
+      "question": "Which video game franchise is Nintendo's best-selling of all time?",
+      "options": ["Super Mario", "Pokémon", "The Legend of Zelda", "Donkey Kong"],
+      "correct_index": 1
+    },
+    {
+      "question": "Which company developed Fortnite?",
+      "options": ["Valve", "Epic Games", "Activision", "Blizzard"],
+      "correct_index": 1
+    },
+    {
+      "question": "What year did the first PlayStation launch in North America?",
+      "options": ["1993", "1994", "1995", "1996"],
+      "correct_index": 2
+    },
+    {
+      "question": "Which esports title is famous for The International tournament?",
+      "options": ["League of Legends", "Counter-Strike", "Dota 2", "Valorant"],
+      "correct_index": 2
+    }
+  ],
+  "tech": [
+    {
+      "question": "Which company's IPO in 2004 priced at $85 per share?",
+      "options": ["Amazon", "Google", "Facebook", "Apple"],
+      "correct_index": 1
+    },
+    {
+      "question": "Which programming language was created by Guido van Rossum?",
+      "options": ["Ruby", "Python", "Go", "Java"],
+      "correct_index": 1
+    },
+    {
+      "question": "What does 'HTTP' stand for?",
+      "options": [
+        "HyperText Transfer Protocol",
+        "High-Traffic Transport Pipeline",
+        "Hyperlink Tracking Transfer Protocol",
+        "HyperText Transmission Process"
+      ],
+      "correct_index": 0
+    },
+    {
+      "question": "Which company makes the A-series chips used in iPhones?",
+      "options": ["Qualcomm", "Samsung", "Apple", "TSMC"],
+      "correct_index": 2
+    }
+  ],
+  "urban": [
+    {
+      "question": "Which NYC borough is Coney Island located in?",
+      "options": ["Queens", "Manhattan", "Brooklyn", "The Bronx"],
+      "correct_index": 2
+    },
+    {
+      "question": "Which subway line runs under Flatbush Avenue in Brooklyn?",
+      "options": ["L train", "2/3 train", "G train", "F train"],
+      "correct_index": 1
+    },
+    {
+      "question": "What's the tallest building in Brooklyn as of the mid-2020s?",
+      "options": ["Brooklyn Tower", "One MetroTech", "Williamsburgh Savings Bank", "9 DeKalb"],
+      "correct_index": 0
+    },
+    {
+      "question": "Prospect Park was designed by the same duo who designed which other park?",
+      "options": ["Bryant Park", "Central Park", "The High Line", "Battery Park"],
+      "correct_index": 1
+    }
+  ],
+  "finance": [
+    {
+      "question": "What does the acronym 'IPO' stand for?",
+      "options": [
+        "Investor Purchase Option",
+        "Initial Public Offering",
+        "Internal Profit Order",
+        "Insider Private Offering"
+      ],
+      "correct_index": 1
+    },
+    {
+      "question": "Which U.S. agency sets the federal funds rate?",
+      "options": ["Treasury", "SEC", "Federal Reserve", "FDIC"],
+      "correct_index": 2
+    },
+    {
+      "question": "What does LTV stand for in real estate lending?",
+      "options": ["Loan-to-Value", "Lease Term Value", "Long-Term Vesting", "Local Tax Variance"],
+      "correct_index": 0
+    }
+  ],
+  "culture": [
+    {
+      "question": "Which chef popularized Brooklyn's food-hall scene with Smorgasburg?",
+      "options": ["Anthony Bourdain", "Eric Demby", "David Chang", "Dominique Ansel"],
+      "correct_index": 1
+    },
+    {
+      "question": "Which hip-hop group popularized the phrase 'Planet Rock'?",
+      "options": ["Wu-Tang Clan", "Public Enemy", "Afrika Bambaataa & Soulsonic Force", "A Tribe Called Quest"],
+      "correct_index": 2
+    },
+    {
+      "question": "Which Brooklyn-born director made Do the Right Thing?",
+      "options": ["Martin Scorsese", "Spike Lee", "Woody Allen", "Darren Aronofsky"],
+      "correct_index": 1
+    }
+  ]
+}

@@ -61,6 +61,64 @@
   font-size: 12px;
 }
 
+/* ============================================================ Turn Timer */
+
+.turn-timer {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(36, 28, 24, 0.85); /* Semi-transparent panel-bg */
+  border: 2px solid var(--color-panel-border);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.turn-timer__label {
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--color-copper);
+  letter-spacing: 1px;
+}
+
+.turn-timer__clock {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--color-text-main);
+}
+
+.turn-timer__bar-track {
+  width: 100%;
+  height: 4px;
+  background: var(--color-bg-deep);
+  margin-top: 4px;
+}
+
+.turn-timer__bar-fill {
+  height: 100%;
+  background: var(--color-neon-blue);
+  transition: width 1s linear;
+}
+
+.turn-timer--danger {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+}
+
+.turn-timer--danger .turn-timer__clock {
+  color: var(--color-danger);
+  animation: pulse-soft 1s ease-in-out infinite;
+}
+
+.turn-timer--danger .turn-timer__bar-fill {
+  background: var(--color-danger);
+  box-shadow: 0 0 5px var(--color-danger);
+}
+
 /* ============================================================ Cards */
 
 .card {
@@ -163,22 +221,42 @@
   background: transparent;
   border: none;
   padding: 0;
-  cursor: pointer;
   animation: tile-bob 2.4s ease-in-out infinite;
-  transition:
-    transform 0.15s ease-out,
+  /* Smoother transition for the hover lift */
+  transition: 
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     filter 0.3s ease;
+  pointer-events: none;
 }
 
-.tile:hover:not(:disabled) {
-  transform: translateY(-6px);
-  z-index: 100;
+.tile:hover {
+  transform: translateY(-8px); /* Slightly higher lift for better feel */
+  /* Remove animation: none to allow smooth blend */
 }
 
-.tile--locked {
-  filter: grayscale(1) brightness(0.55) opacity(0.7);
+/* Exit delay to prevent flickering when mouse passes between hitboxes */
+.tile:not(:hover) {
+  transition-delay: 0.05s;
+}
+
+.tile--locked, .tile--expired {
   animation: none;
-  cursor: not-allowed;
+  cursor: default;
+}
+
+.tile--locked .tile__hitbox, .tile--expired .tile__hitbox {
+  pointer-events: auto; /* Allow hover lift */
+  cursor: default;
+}
+
+/* Ghostly Glass for future properties (light, transparent, desaturated) */
+.tile--locked {
+  filter: grayscale(0.8) brightness(1.1) opacity(0.45);
+}
+
+/* Cold Grayscale for expired properties */
+.tile--expired {
+  filter: grayscale(1) brightness(0.4) opacity(0.5);
 }
 
 .tile__base {
@@ -190,6 +268,7 @@
   background: var(--color-copper);
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   opacity: 0.35;
+  pointer-events: none; /* Hitbox elements handle clicks */
 }
 
 .tile__shadow {
@@ -202,6 +281,7 @@
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   opacity: 0.45;
   filter: blur(2px);
+  pointer-events: none;
 }
 
 .tile__sprite {
@@ -211,7 +291,126 @@
   transform: translateX(-50%);
   width: 128px;
   height: 128px;
-  pointer-events: none;
+  pointer-events: none; /* Hitbox elements handle clicks */
+}
+
+/* Precise Hitboxes */
+.tile__hitbox {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.tile__hitbox--base {
+  width: 60px;
+  height: 30px;
+  top: 128px;
+}
+
+.tile__hitbox--left {
+  width: 25px;
+  height: 25px;
+  left: 10%;
+  top: 128px;
+}
+
+.tile__hitbox--mid-left {
+  width: 20px;
+  height: 20px;
+  left: 30%;
+  top: 128px;
+}
+
+.tile__hitbox--outer-upper-left {
+  width: 20px;
+  height: 20px;
+  left: 20%;
+  top: 118px;
+}
+
+.tile__hitbox--upper-left {
+  width: 20px;
+  height: 20px;
+  left: 35%;
+  top: 110px;
+}
+
+.tile__hitbox--inner-upper-left {
+  width: 20px;
+  height: 20px;
+  left: 45%;
+  top: 102px;
+}
+
+.tile__hitbox--lower-left {
+  width: 20px;
+  height: 20px;
+  left: 30%;
+  top: 140px;
+}
+
+.tile__hitbox--right {
+  width: 25px;
+  height: 25px;
+  left: 90%;
+  top: 128px;
+}
+
+.tile__hitbox--mid-right {
+  width: 20px;
+  height: 20px;
+  left: 70%;
+  top: 128px;
+}
+
+.tile__hitbox--outer-upper-right {
+  width: 20px;
+  height: 20px;
+  left: 80%;
+  top: 118px;
+}
+
+.tile__hitbox--upper-right {
+  width: 20px;
+  height: 20px;
+  left: 65%;
+  top: 110px;
+}
+
+.tile__hitbox--inner-upper-right {
+  width: 20px;
+  height: 20px;
+  left: 55%;
+  top: 102px;
+}
+
+.tile__hitbox--bottom {
+  width: 25px;
+  height: 25px;
+  left: 50%;
+  top: 152px;
+}
+
+.tile__hitbox--lower {
+  width: 50px;
+  height: 50px;
+  top: 105px;
+}
+
+.tile__hitbox--mid {
+  width: 45px;
+  height: 45px;
+  top: 75px;
+}
+
+.tile__hitbox--top {
+  width: 35px;
+  height: 35px;
+  top: 45px;
 }
 
 .tile__tier {
@@ -241,8 +440,65 @@
 .tile--owned-rival .tile__tier { color: var(--color-orange); }
 
 .tile--selected {
-  outline: 2px solid var(--color-text-main);
-  outline-offset: -2px;
+  /* z-index handled by natural row order in PropertyTile.tsx */
+}
+
+.tile--selected .tile__sprite {
+  transform: translateX(-50%) translateY(-6px);
+  filter: brightness(1.2) saturate(1.1);
+}
+
+.tile__selection-indicator {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 32px;
+  z-index: 30;
+  filter: drop-shadow(0 0 1px #fff);
+  /* Sync pulse with tile-bob (2.4s) and remove vertical motion to inherit tile's bob */
+  animation: selection-pulse-sync 2.4s ease-in-out infinite;
+}
+
+@keyframes selection-pulse-sync {
+  0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.8; transform: translateX(-50%) scale(0.96); }
+}
+
+/* The actual 3D Pyramid (nested container to bob together) */
+.tile__selection-pyramid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Top base of the pyramid (rhombus - fixed 2:1 perspective) */
+.tile__selection-pyramid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 16px;
+  background: #d9ff00;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  z-index: 2;
+}
+
+/* Side facets */
+.tile__selection-pyramid::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 32px;
+  height: 24px;
+  background: linear-gradient(90deg, #27ae60 50%, #145c32 50%);
+  clip-path: polygon(0 0, 50% 33%, 100% 0, 50% 100%);
+  z-index: 1;
 }
 
 /* Tile badges (top corners) */
@@ -260,26 +516,33 @@
   z-index: 10;
 }
 
-.tile__badge--expiry {
+.tile__badge--danger {
   left: 6px;
-  background: var(--color-copper);
-  color: var(--color-bg-deep);
-  min-width: 14px;
-  text-align: center;
-}
-
-.tile__badge--expiry.tile__badge--danger {
   background: var(--color-danger);
   color: var(--color-text-main);
   animation: pulse-soft 1s ease-in-out infinite;
+  min-width: 14px;
+  text-align: center;
+  font-size: 10px;
 }
 
-.tile__badge--eyes {
-  right: 6px;
-  background: var(--color-orange);
-  border-color: var(--color-bg-deep);
-  font-size: 10px;
-  animation: pulse-soft 2s ease-in-out infinite;
+.tile__badge--status {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-text-muted);
+  color: var(--color-text-muted);
+  font-size: 8px;
+  padding: 2px 4px;
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+.tile__badge--expired {
+  background: #333;
+  color: #777;
+  border-color: #444;
 }
 
 /* ============================================================ Dice modal */
@@ -287,7 +550,7 @@
 .dice-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 6, 4, 0.82);
+  background: rgba(10, 6, 4, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -355,6 +618,89 @@
 
 .dice--spinning .dice__face {
   animation: dice-spin 1.4s linear;
+}
+
+/* ============================================================ Trivia modal */
+
+.trivia-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 6, 4, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fade-in 0.2s ease-out;
+}
+
+.trivia-modal {
+  background: var(--color-panel-bg);
+  border: 2px solid var(--color-copper);
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 460px;
+  max-width: 560px;
+}
+
+.trivia-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.trivia-modal__tag { color: var(--color-gold); }
+.trivia-modal__source { color: var(--color-text-muted); }
+
+.trivia-modal__question {
+  font-size: 18px;
+  color: var(--color-text-main);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.trivia-modal__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trivia-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-bg-deep);
+  border: 2px solid var(--color-panel-border);
+  color: var(--color-text-main);
+  padding: 10px 12px;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.trivia-option:hover:not(:disabled) {
+  border-color: var(--color-copper);
+}
+
+.trivia-option--selected {
+  border-color: var(--color-gold);
+  background: rgba(184, 115, 42, 0.15);
+}
+
+.trivia-option__letter {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--color-copper);
+  min-width: 18px;
+}
+
+.trivia-option__text {
+  flex: 1;
 }
 
 /* ============================================================ Intel feed */

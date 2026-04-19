@@ -2,13 +2,22 @@
 Core game engine — state initialization, turn lifecycle, and player actions.
 All math aligned to architecture.md config constants.
 """
+import json
 import random
+import time
 from sqlalchemy.orm import Session
-from backend.models.core import GameState, Player, Property
+from backend.models.core import Catalyst, GameState, Player, Property, TriviaSession
 from backend.config import BALANCE
 import backend.config as config
 from backend.game_engine.ai.base import Action, RivalStrategy
 from backend.game_engine.ai.flipper import FlipperStrategy
+from backend.game_engine.catalysts import (
+    fire_catalysts_for_turn,
+    generate_catalysts_for_game,
+    pick_catalyst_for_research,
+    reveal_catalyst,
+)
+from backend.game_engine.trivia import generate_trivia
 
 # ──────────────────────────────────────────────
 #  PROPERTY BLUEPRINTS (10 total, matching sprites)
@@ -60,6 +69,8 @@ def create_new_game(db: Session, session_id: str) -> GameState:
     """Initializes a new game: players + 10 property plots."""
 
     # Wipe any existing session
+    db.query(TriviaSession).filter(TriviaSession.game_id == session_id).delete()
+    db.query(Catalyst).filter(Catalyst.game_id == session_id).delete()
     db.query(Property).filter(Property.game_id == session_id).delete()
     db.query(Player).filter(Player.game_id == session_id).delete()
     db.query(GameState).filter(GameState.id == session_id).delete()
@@ -87,6 +98,14 @@ def create_new_game(db: Session, session_id: str) -> GameState:
     )
     db.add_all([user, flipper])
 
+    # Group and shuffle unlock schedules by tier
+    unlocks_by_tier = {}
+    for bp in BLUEPRINTS:
+        unlocks_by_tier.setdefault(bp["tier"], []).append(bp["unlock"])
+        
+    for tier in unlocks_by_tier:
+        random.shuffle(unlocks_by_tier[tier])
+
     # Properties
     for bp in BLUEPRINTS:
         prop = Property(
@@ -102,17 +121,59 @@ def create_new_game(db: Session, session_id: str) -> GameState:
             dev_level=0,
             tenant_bonus=1.0,
             is_listed=False,
-            unlock_turn=bp["unlock"],
+            unlock_turn=unlocks_by_tier[bp["tier"]].pop(),
         )
         db.add(prop)
 
     db.commit()
+
+    # Schedule catalyst events for the whole game
+    generate_catalysts_for_game(db, game)
+
     return game
 
 
 # ──────────────────────────────────────────────
 #  TURN LIFECYCLE
 # ──────────────────────────────────────────────
+
+def _check_time(game: GameState) -> dict | None:
+    """Helper to reject actions if the speed timer has run out."""
+    if game.is_paused:
+        return None
+    if game.turn_expires_at and time.time() > game.turn_expires_at:
+        return {"success": False, "error": "Turn time expired (Speed Tycoon mode)"}
+    return None
+
+
+def pause_game(db: Session, game: GameState) -> dict:
+    """Freeze the speed timer."""
+    if game.turn_expires_at:
+        game.timer_remaining_at_pause = max(0, game.turn_expires_at - time.time())
+        game.turn_expires_at = None
+    
+    game.is_paused = True
+    db.commit()
+    return {"success": True, "remaining": game.timer_remaining_at_pause}
+
+
+def resume_game(db: Session, game: GameState) -> dict:
+    """Unfreeze the speed timer."""
+    if game.timer_remaining_at_pause is not None:
+        game.turn_expires_at = time.time() + game.timer_remaining_at_pause
+        game.timer_remaining_at_pause = None
+    
+    game.is_paused = False
+    db.commit()
+    return {"success": True, "expires_at": game.turn_expires_at}
+
+
+def activate_timer(db: Session, game: GameState) -> dict:
+    """Explicitly start the 40-second speed timer."""
+    game.turn_expires_at = time.time() + BALANCE.TURN_TIME_LIMIT
+    db.commit()
+    return {"success": True, "expires_at": game.turn_expires_at}
+
 
 def start_turn(db: Session, game: GameState) -> dict:
     """
@@ -141,7 +202,7 @@ def start_turn(db: Session, game: GameState) -> dict:
     
     for prop in props:
         prop.is_listed = True
-        prop.expiry_turn = game.turn + BALANCE.PROPERTY_EXPIRY_TURNS
+        prop.expiry_turn = game.turn + random.randint(BALANCE.PROPERTY_EXPIRY_MIN_TURNS, BALANCE.PROPERTY_EXPIRY_MAX_TURNS)
         newly_listed.append(prop.id)
 
     # 3. Roll AP
@@ -171,6 +232,9 @@ def end_turn(db: Session, game: GameState) -> dict:
     """
     # 1. AI Phase: rivals execute any pending buys/sells before rent is settled.
     ai_events = ai_phase(db, game)
+
+    # 1b. Catalyst phase: fire scheduled events and expire old ones.
+    catalyst_events = fire_catalysts_for_turn(db, game)
 
     user = db.query(Player).filter(
         Player.game_id == game.id, Player.role == "USER"
@@ -231,6 +295,8 @@ def end_turn(db: Session, game: GameState) -> dict:
     else:
         game.turn += 1
         game.current_ap = 0 # AP resets
+    
+    game.turn_expires_at = None # Reset timer
 
     # 6. AI Scan: flag next-turn targets so the 👀 icon is visible immediately.
     ai_scan_phase(db, game)
@@ -244,6 +310,7 @@ def end_turn(db: Session, game: GameState) -> dict:
         "game_over": game_over,
         "victory": victory,
         "ai_events": ai_events,
+        "catalyst_events": catalyst_events,
     }
 
 
@@ -258,12 +325,21 @@ def buy_property(db: Session, game: GameState, player: Player, property_id: str)
       - Player must have enough cash
       - Deducts cash, assigns ownership, delists
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 
     prop = db.query(Property).filter(Property.id == property_id).first()
     if not prop:
         return {"success": False, "error": "Property not found"}
+    
+    # Safety: check if listing has technically already expired but not yet delisted
+    if prop.expiry_turn is not None and prop.expiry_turn < game.turn:
+        prop.is_listed = False
+        db.commit()
+        return {"success": False, "error": "Property listing has expired"}
+
     if not prop.is_listed:
         return {"success": False, "error": "Property is not currently listed"}
     if prop.owner_id is not None:
@@ -296,6 +372,8 @@ def develop_property(db: Session, game: GameState, player: Player, property_id: 
       - Cost = $500 + 15% × market_value
       - Increases dev_level, recalculates rent and market value
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 
@@ -331,12 +409,22 @@ def develop_property(db: Session, game: GameState, player: Player, property_id: 
     }
 
 
-def research_action(db: Session, game: GameState, player: Player, property_id: str) -> dict:
+def research_action(
+    db: Session,
+    game: GameState,
+    player: Player,
+    property_id: str,
+    difficulty: str = "medium",
+) -> dict:
     """
-    Research action (1 AP):
-      - Reveals intel about a property or upcoming catalyst
-      - Full trivia engine is Phase 5; this is a working stub
+    Research action (1 AP) — step 1 of 2:
+      - Picks a future catalyst to quiz the player about
+      - Generates a trivia question (OpenAI or fallback)
+      - Stores a TriviaSession for this player; AP is NOT deducted yet —
+        the AP is spent when the player submits an answer.
     """
+    if time_err := _check_time(game): return time_err
+
     if game.current_ap < 1:
         return {"success": False, "error": "Not enough AP (need 1)"}
 
@@ -344,22 +432,106 @@ def research_action(db: Session, game: GameState, player: Player, property_id: s
     if not prop:
         return {"success": False, "error": "Property not found"}
 
-    game.current_ap -= 1
+    # If there's already an open session, return that instead of generating a new one.
+    existing = db.query(TriviaSession).filter(TriviaSession.id == player.id).first()
+    if existing:
+        return _trivia_session_response(existing)
+
+    catalyst = pick_catalyst_for_research(db, game)
+    if catalyst is None:
+        return {"success": False, "error": "No catalysts left to research — game is too late"}
+
+    q = generate_trivia(theme=catalyst.theme, category=catalyst.category, difficulty=difficulty)
+
+    session = TriviaSession(
+        id=player.id,
+        game_id=game.id,
+        player_id=player.id,
+        catalyst_id=catalyst.id,
+        property_id=property_id,
+        question=q.question,
+        options_json=json.dumps(q.options),
+        correct_index=q.correct_index,
+        category=q.category,
+        source=q.source,
+        created_turn=game.turn,
+    )
+    db.add(session)
     db.commit()
 
-    # Stub: return basic property intel
+    return _trivia_session_response(session)
+
+
+def answer_trivia(db: Session, game: GameState, player: Player, answer_index: int) -> dict:
+    """
+    Research action — step 2 of 2:
+      - Validates the submitted answer against the active TriviaSession
+      - Correct: reveals the catalyst (theme + direction + effects + turn)
+      - Wrong: returns misleading intel (flipped direction); AP is still spent
+      - Deducts 1 AP on resolution and clears the session
+    """
+    session = db.query(TriviaSession).filter(TriviaSession.id == player.id).first()
+    if not session:
+        return {"success": False, "error": "No active research question"}
+
+    if game.current_ap < 1:
+        return {"success": False, "error": "Not enough AP to resolve research"}
+
+    catalyst = db.query(Catalyst).filter(Catalyst.id == session.catalyst_id).first()
+    prop = db.query(Property).filter(Property.id == session.property_id).first()
+
+    correct = answer_index == session.correct_index
+    game.current_ap -= 1
+
+    intel: dict = {}
+    if catalyst:
+        if correct:
+            reveal_catalyst(db, catalyst)
+            intel = {
+                "theme": catalyst.theme,
+                "direction": catalyst.direction,
+                "fires_on_turn": catalyst.scheduled_turn,
+                "rent_multiplier": catalyst.rent_multiplier,
+                "value_multiplier": catalyst.value_multiplier,
+                "duration": catalyst.duration,
+                "copy": catalyst.copy,
+            }
+        else:
+            # Misleading: flip the direction in the hint
+            flipped = "boom" if catalyst.direction == "bust" else "bust"
+            intel = {
+                "theme": catalyst.theme,
+                "direction": flipped,
+                "fires_on_turn": None,
+                "misleading": True,
+                "copy": "Bad intel — your source was unreliable.",
+            }
+
+    # Clear the session regardless
+    db.delete(session)
+    db.commit()
+
     return {
         "success": True,
-        "property": prop.name,
-        "intel": {
-            "base_value": prop.base_value,
-            "market_value": prop.market_value,
-            "rent_per_turn": prop.rent_value,
-            "dev_level": prop.dev_level,
-            "tier": prop.tier,
-            "hint": "The trivia engine will replace this stub in Phase 5.",
-        },
+        "correct": correct,
+        "correct_index": session.correct_index,
+        "property": prop.name if prop else None,
+        "intel": intel,
         "ap_remaining": game.current_ap,
+    }
+
+
+def _trivia_session_response(session: TriviaSession) -> dict:
+    return {
+        "success": True,
+        "trivia": {
+            "question_id": session.id,
+            "question": session.question,
+            "options": json.loads(session.options_json),
+            "category": session.category,
+            "source": session.source,
+            "property_id": session.property_id,
+        },
     }
 
 
